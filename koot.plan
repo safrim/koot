@@ -1,100 +1,53 @@
-This implementation plan is organized into **logical, session-based milestones**. Each session represents a single, focused block of development (roughly 2–4 hours) that results in a verifiable "unit" of the system.
+koot: Implementation Plan
+Phase 1: The Adaptive Core
 
----
+    Session 1: The "Secret Envelope" Specification. Design the standard JSON/binary structure containing the Header, Crypto-ID, Payload, and Merkle Root. Write a script to serialize and deserialize this data structure.
 
-## Phase 1: The Agnostic Kernel (Fundamental Logic)
 
-**Session 1: The "Secret Envelope" Data Specification**
-*   **Goal:** Define the DNA of the system.
-*   **Action:** Design the binary or JSON structure for the "Envelope." It must include a **Header** (version, content-type, crypto-suite-ID, IV/nonce) and a **Payload** (the encrypted blob).
-*   **Outcome:** A script that can pack and unpack empty envelopes with metadata.
+Session 2: The Adaptive Registry Bus. Build the central Plugin Manager. Implement the EnvironmentSensor module that detects the host OS, CPU instructions such as AES-NI, and available RAM to influence plugin loading.
 
-**Session 2: The Plugin Registry Bus**
-*   **Goal:** Establish the modular architecture.
-*   **Action:** Build the `Registry` manager. Define "Interfaces" (abstract classes) for `CryptoDriver`, `AuthDriver`, and `StorageDriver`.
-*   **Outcome:** A system that can load a "Dummy" driver at runtime without modifying the core kernel code.
 
-**Session 3: The Entropy Pipeline (Argon2id)**
-*   **Goal:** Securely derive keys from user/machine input.
-*   **Action:** Implement **Argon2id** hashing. Configure it with high memory-cost parameters to ensure it is resistant to GPU/ASIC cracking.
-*   **Outcome:** A module that converts a passphrase or hardware salt into a consistent 256-bit Master Key.
+Session 3: The Entropy Pipeline. Implement the Argon2id hashing module to securely convert passwords, bio-hashes, or hardware salts into a consistent 256-bit Master Key.
 
----
+Phase 2: Quantum-Safe Cryptography
 
-## Phase 2: Quantum-Safe Security Layer
+Session 4: Hardware-Aware Classical Crypto. Implement AES-256-GCM. Write the logic so it utilizes hardware acceleration if the Environment Sensor detects it, or defaults to a software fallback if not.
 
-**Session 4: The Classical Crypto Driver (AES-GCM)**
-*   **Goal:** High-speed authenticated encryption.
-*   **Action:** Implement **AES-256-GCM**. Ensure the driver handles nonce uniqueness and validates the authentication tag during decryption.
-*   **Outcome:** The ability to encrypt and decrypt strings/keys within the Envelope structure.
 
-**Session 5: The Post-Quantum (PQC) Integration**
-*   **Goal:** Lattice-based security.
-*   **Action:** Integrate a PQC library (e.g., `liboqs`) to implement **ML-KEM (Kyber)** for key encapsulation.
-*   **Outcome:** A driver capable of performing quantum-resistant key exchanges.
+Session 5: Post-Quantum (PQC) Layer. Integrate a lattice-based library like liboqs to implement ML-KEM (Kyber) for quantum-resistant key encapsulation.
 
-**Session 6: The Hybrid Combiner**
-*   **Goal:** Fuse both worlds.
-*   **Action:** Develop the logic to combine the classical AES key and the quantum Kyber key using **SHA-3 (Keccak)**. 
-*   **Outcome:** A "Quantum-Safe" encryption suite that remains secure even if one algorithm is eventually compromised.
 
----
+Session 6: The Hybrid Combiner. Develop the logic to securely hash the AES key and the Kyber key together using SHA-3, forming the ultimate session key.
 
-## Phase 3: Large Media & Document Subsystem
+Phase 3: Media Handling & Multi-Backend Storage
 
-**Session 7: The Segmented Chunking Engine**
-*   **Goal:** Handle multi-gigabyte files efficiently.
-*   **Action:** Create a stream processor that reads/writes files in **64KB segments**. 
-*   **Outcome:** Encryption of large documents/videos without loading the entire file into RAM.
+Session 7: The Adaptive Chunking Engine. Write a stream processor to handle large files in 64KB blocks. Tie this directly to the Environment Sensor so the chunk size scales down dynamically if the system RAM drops.
 
-**Session 8: Merkle Tree Integrity Layer**
-*   **Goal:** Prevent bit-level tampering in large files.
-*   **Action:** Build a **Merkle Tree** generator. Store the "Root Hash" in the Envelope Header to verify the entire file's integrity.
-*   **Outcome:** Immediate detection of any corruption or unauthorized modification in encrypted media.
 
----
+Session 8: Merkle Tree Integrity. Implement the hash-tree generator to cryptographically link all chunks, storing the root hash securely in the Envelope header.
 
-## Phase 4: Persistence, Migration & Subsystem Logic
 
-**Session 9: The Storage Adapter Interface**
-*   **Goal:** Abstract the "where" from the "what."
-*   **Action:** Implement the `StorageDriver` base. Build a **Local Filesystem** driver to save Envelopes as `.vault` files.
-*   **Outcome:** Persistent storage of encrypted secrets.
+Session 9: Storage Adapters. Build the abstract StorageDriver interface. Implement the initial Local Filesystem and SQLite drivers.
 
-**Session 10: SQL & Cloud Adapters**
-*   **Goal:** Database flexibility.
-*   **Action:** Build a **SQLite/PostgreSQL** driver and a basic **S3/Object Storage** driver.
-*   **Outcome:** The system can now save secrets to a database table or a cloud bucket.
 
-**Session 11: The Migration & Mirroring Utility**
-*   **Goal:** Provider independence.
-*   **Action:** Write a utility that reads all Envelopes from one driver (e.g., Local) and "pumps" them into another (e.g., Cloud) while verifying hashes.
-*   **Outcome:** One-command migration of the entire vault between infrastructures.
+Session 10: Live Migration Utility. Create the tool to read Envelopes from one Storage Adapter and write them to another, enabling seamless multi-cloud mirroring capabilities.
 
----
+Phase 4: Connectivity & Zero-Trust Integration
 
-## Phase 5: Connectivity & Integration
+Session 11: Local Subsystem Gateway (IPC). Build a Unix Domain Socket or Named Pipe server to allow host applications to request vaulting services locally.
 
-**Session 12: Local Subsystem Gateway (IPC)**
-*   **Goal:** Connect to a "Larger System."
-*   **Action:** Implement a **Unix Domain Socket** or **Named Pipe** server. Create a simple API for the host system to request `Vault(data)` or `Unvault(UUID)`.
-*   **Outcome:** The vault now runs as a headless "Sidecar" service.
 
-**Session 13: The Zero-Trust Network Gateway (mTLS)**
-*   **Goal:** Secure remote access.
-*   **Action:** Implement an HTTPS/gRPC listener that mandates **Mutual TLS**. Generate and validate X.509 Client Certificates.
-*   **Outcome:** Remote access that is mathematically invisible to anyone without your specific hardware certificate.
+Session 12: Zero-Trust Network Gateway. Implement the mTLS listener for remote access, strictly requiring and validating X.509 Client Certificates.
 
-**Session 14: Machine Identity (TPM/AppRole)**
-*   **Goal:** Automated hardware trust.
-*   **Action:** Integrate a module to unlock the vault using the host's **TPM 2.0** chip signature.
-*   **Outcome:** Secure "Secret Zero" handling where the vault unlocks itself based on the physical hardware it is running on.
 
----
+Session 13: Machine Identity. Create the module to read a TPM 2.0 signature, allowing a larger host system to unlock the vault without requiring a human password.
 
-## Phase 6: Governance & Resilience
+Phase 5: Telemetry, Governance & Override
 
-**Session 15: The Immutable Audit & "Nuke" Module**
-*   **Goal:** Accountability and emergency response.
-*   **Action:** Build an append-only, signed log for all actions. Implement a "Dead Man's Switch" or "Emergency Wipe" function.
-*   **Outcome:** A tamper-proof history of access and a functional emergency protocol.
+Session 14: Analytics & Telemetry Engine. Build a passive observer plugin that logs throughput, encryption times, and memory usage, outputting a real-time JSON state report.
+
+
+Session 15: Immutable Audit & "Nuke" Protocol. Implement the append-only access log. Build the "Dead Man's Switch" module for automated vault wiping or locking during a detected breach.
+
+
+Session 16: The Manual Override Matrix. Create a high-priority command interface that requires an Admin token. This interface must be able to instantly halt migrations, pause self-healing operations, or abort a "Nuke" countdown.
