@@ -1,4 +1,30 @@
+# ==========================================
+# koot .gitignore
+# ==========================================
+
+# 1. Python Environment & Bytecode
+# Generated when we ran standard Python and the update script
 __pycache__/
 *.pyc
+*.py[cod]
+*$py.class
+
+# 2. Virtual Environment
+# The isolated environment we just created for our strict dependencies
+venv/
+env/
 .env
+
+# 3. Pytest Caches
+# Generated when we ran the interface compliance test suite (Phase 1.1)
+.pytest_cache/
+
+# 4. OS & Editor Specific (Best Practice)
+# Keeps your repo clean regardless of what OS or IDE you use
+.DS_Store
+.vscode/
+.idea/
+
+# miscellaneous
+/docs/keywords_and_phrases.md
 *.vault
