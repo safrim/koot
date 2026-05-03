@@ -4,12 +4,16 @@ This plan is strictly organized into logical, one-session milestones that should
 
 #### **Phase 1: The Adaptive Core & Capability Matrix**
 
-    * **Session 1: The "Secret Envelope" Specification.** 
+    **Session 1: The "Secret Envelope" Specification.** 
         Design the standard JSON/binary structure containing the Header, Crypto-ID, Payload, and Merkle Root[]. Write a script to serialize and deserialize this data structure[].
     
-    * **Session 2: The Adaptive Registry Bus.** Build the central Plugin Manager[]. Implement the EnvironmentSensor module that detects the host OS, CPU instructions such as AES-NI, and available RAM to influence plugin loading[].
-    * **[Engineered Countermeasure: Strict Process Isolation] (Session 2 Addendum):** Implement WebAssembly (Wasm) sandboxing or strict Inter-Process Communication (IPC) layers[]. Ensure plugins only receive exact variables they explicitly request, and their memory is automatically garbage-collected/wiped by the sandbox runtime[].
-    * **[Engineered Countermeasure: Tiered Plugin Contracts] (Session 2 Addendum):** Establish a "Tier 1" stack that receives exhaustive automated CI/CD testing[]. Require all third-party or custom plugins to pass an automated "Interface Compliance Test Suite" before the bus will even allow them to mount[].
+    **Session 2: The Adaptive Registry Bus.** 
+        Build the central Plugin Manager[]. Implement the EnvironmentSensor module that detects the host OS, CPU instructions such as AES-NI, and available RAM to influence plugin loading[].
+
+        * **[Engineered Countermeasure: Strict Process Isolation] (Session 2 Addendum):** Implement WebAssembly (Wasm) sandboxing or strict Inter-Process Communication (IPC) layers[]. Ensure plugins only receive exact variables they explicitly request, and their memory is automatically garbage-collected/wiped by the sandbox runtime[].
+    
+        * **[Engineered Countermeasure: Tiered Plugin Contracts] (Session 2 Addendum):** Establish a "Tier 1" stack that receives exhaustive automated CI/CD testing[]. Require all third-party or custom plugins to pass an automated "Interface Compliance Test Suite" before the bus will even allow them to mount[].
+
     * **Session 3: The Dynamic Schema & Capability Matrix.** Build the queryable manifest that allows the system to output a comprehensive list of every data type it can handle[]. Implement the Opt-In Activation logic so the system actively rejects deactivated data types (like health records) to minimize the attack surface[]. Code the Modular Schema "Hot-Swapping" feature so future schema packs can be plugged in or completely unplugged dynamically[].
     * **[Engineered Countermeasure: Schema Tombstoning] (Session 3 Addendum):** Implement a "Legacy Read-Only" state[]. When a schema is "unplugged," ensure the system refuses to create new data of that type, but retains the decryption mapping so older Envelopes can still be read, exported, or manually migrated to a new active schema[].
     * **Session 4: The Entropy Pipeline.** Implement the Argon2id hashing module to securely convert passwords, bio-hashes, or hardware salts into a consistent 256-bit Master Key[].
