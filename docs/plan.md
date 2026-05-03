@@ -15,9 +15,12 @@ This plan is strictly organized into logical, one-session milestones that should
         * **[Engineered Countermeasure: Tiered Plugin Contracts] (Session 2 Addendum):** Establish a "Tier 1" stack that receives exhaustive automated CI/CD testing[]. Require all third-party or custom plugins to pass an automated "Interface Compliance Test Suite" before the bus will even allow them to mount[].
 
     * **Session 3: The Dynamic Schema & Capability Matrix.** Build the queryable manifest that allows the system to output a comprehensive list of every data type it can handle[]. Implement the Opt-In Activation logic so the system actively rejects deactivated data types (like health records) to minimize the attack surface[]. Code the Modular Schema "Hot-Swapping" feature so future schema packs can be plugged in or completely unplugged dynamically[].
-    * **[Engineered Countermeasure: Schema Tombstoning] (Session 3 Addendum):** Implement a "Legacy Read-Only" state[]. When a schema is "unplugged," ensure the system refuses to create new data of that type, but retains the decryption mapping so older Envelopes can still be read, exported, or manually migrated to a new active schema[].
+
+        * **[Engineered Countermeasure: Schema Tombstoning] (Session 3 Addendum):** Implement a "Legacy Read-Only" state[]. When a schema is "unplugged," ensure the system refuses to create new data of that type, but retains the decryption mapping so older Envelopes can still be read, exported, or manually migrated to a new active schema[].
+        
     * **Session 4: The Entropy Pipeline.** Implement the Argon2id hashing module to securely convert passwords, bio-hashes, or hardware salts into a consistent 256-bit Master Key[].
-    * **[Engineered Countermeasure: Hard Upper Limits & Fallbacks] (Session 4 Addendum):** Hardcode absolute memory ceilings based on device architecture tiers (e.g., Mobile, IoT, Desktop)[]. Before Argon2id executes, perform a dry-run memory allocation check[]. If it fails, code it to seamlessly drop down to a safe, pre-calculated fallback parameter set[].
+    
+        * **[Engineered Countermeasure: Hard Upper Limits & Fallbacks] (Session 4 Addendum):** Hardcode absolute memory ceilings based on device architecture tiers (e.g., Mobile, IoT, Desktop)[]. Before Argon2id executes, perform a dry-run memory allocation check[]. If it fails, code it to seamlessly drop down to a safe, pre-calculated fallback parameter set[].
 
 #### **Phase 2: Quantum-Safe Cryptography**
 
