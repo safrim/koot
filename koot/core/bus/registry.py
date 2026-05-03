@@ -1,72 +1,126 @@
-from typing import Dict, Any, Type, Callable
+import uuid
+import multiprocessing
 import logging
+from .environment import EnvironmentSensor
+# from .contracts import ContractEnforcer  # Assuming we implement this later
 
-class PluginSandbox:
-    """
-    [ENGINEERED COUNTERMEASURE: Strict Process Isolation]
-    A wrapper that ensures plugins only receive explicit inputs and cannot 
-    access the broader global state. (Precursor to Wasm/IPC).
-    """
-    def __init__(self, plugin_instance: Any, name: str):
-        self._plugin = plugin_instance
-        self._name = name
+# Configure basic timely notifications
+logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 
-    def execute(self, method_name: str, **kwargs) -> Any:
-        if not hasattr(self._plugin, method_name):
-            raise AttributeError(f"Sandbox Error: Plugin '{self._name}' has no method '{method_name}'")
+class AdaptiveRegistry:
+    """
+    The Central Nervous System of koot.
+    Handles strict isolation, intelligent hardware routing, and manual overrides.
+    """
+    
+    def __init__(self, override_matrix: dict = None):
+        """
+        Initializes the bus.
+        :param override_matrix: A dictionary of admin-forced settings (e.g., {"force_software_aes": True})
+        """
+        self.sensor = EnvironmentSensor()
+        self.telemetry = self.sensor.get_telemetry()
+        self.plugins = {}
         
-        method = getattr(self._plugin, method_name)
+        # CORE MANDATE: The Manual Override Matrix
+        self.overrides = override_matrix or {}
         
-        # In a full Wasm implementation, this is where we would serialize kwargs, 
-        # send to the sandbox, wait for the result, and trigger memory wiping.
+        self._notify_system_state()
+
+    def _notify_system_state(self):
+        """CORE MANDATE: Clear & Timely Notifications regarding System Health."""
+        logging.info(f"System Boot: {self.telemetry['os']} | Tier: {self.telemetry['tier']}")
+        
+        if not self.telemetry['system_health']['entropy_healthy']:
+            logging.warning("CRITICAL: OS Entropy is low. Key generation may be unsafe.")
+            
+        if self.telemetry['system_health']['thermal_load'] == "CRITICAL_HEAT":
+            logging.warning("THERMAL ALARM: CPU is overheating. System will throttle heavy tasks.")
+
+    def resolve_capability(self, domain: str) -> str:
+        """
+        CORE MANDATE: Intelligent Automation combined with Manual Overrides.
+        Determines exactly which version of a plugin to load based on hardware,
+        UNLESS an admin override is active.
+        """
+        # Example 1: Resolving Cryptography
+        if domain == "crypto":
+            # 1. Check for Manual Override first
+            if self.overrides.get("force_software_crypto"):
+                logging.info("[OVERRIDE] Forcing Software Crypto despite hardware capabilities.")
+                return "crypto.fallback"
+            
+            # 2. Intelligent Automation
+            if self.telemetry['hardware_accel']['aes_ni']:
+                logging.info("[AUTO] Hardware AES-NI detected. Routing to Accelerated Crypto.")
+                return "crypto.accelerated"
+            else:
+                logging.info("[AUTO] No AES-NI detected. Routing to Fallback Crypto.")
+                return "crypto.fallback"
+
+        # Example 2: Resolving Data Streaming (Thermal Throttling)
+        if domain == "streaming":
+            if self.overrides.get("ignore_thermals"):
+                logging.warning("[OVERRIDE] Thermal throttling disabled. Proceeding at maximum speed.")
+                return "stream.max_throughput"
+                
+            if self.telemetry['system_health']['thermal_load'] == "CRITICAL_HEAT":
+                logging.info("[AUTO] Thermal limit reached. Routing to Throttled Streamer.")
+                return "stream.throttled"
+            
+            return "stream.max_throughput"
+
+        return "unknown.plugin"
+
+    def mount_plugin(self, name: str, plugin_module):
+        """
+        Mounts the validated plugin into a strictly isolated process.
+        """
+        # (Contract enforcement would happen here)
+        
         try:
-            result = method(**kwargs)
-            # Memory Wipe Simulation: Ensure variables aren't hanging around
-            del kwargs 
-            return result
+            parent_conn, child_conn = multiprocessing.Pipe()
+            
+            process = multiprocessing.Process(
+                target=self._actor_loop, 
+                args=(child_conn, plugin_module),
+                daemon=True
+            )
+            process.start()
+            
+            self.plugins[name] = {
+                "pipe": parent_conn,
+                "process": process
+            }
+            logging.info(f"Mounted isolated capability: '{name}' (PID: {process.pid})")
         except Exception as e:
-            logging.error(f"[SANDBOX BREACH] Plugin {self._name} crashed during {method_name}: {e}")
-            raise
+            logging.error(f"Failed to mount capability '{name}': {e}")
 
-class PluginRegistry:
-    """
-    The adaptive registry bus that manages and isolates swappable plugins.
-    Enforces hardware thresholds and interface compliance.
-    """
-    def __init__(self, system_profile: dict):
-        self._plugins: Dict[str, PluginSandbox] = {}
-        self._system_profile = system_profile
-        logging.basicConfig(level=logging.INFO, format='%(message)s')
-        self.logger = logging.getLogger("RegistryBus")
+    def _actor_loop(self, pipe, plugin_module):
+        """The isolated execution field for the plugin (Zero-Shared Memory)."""
+        while True:
+            try:
+               msg = pipe.recv()
+               action = msg.get("action")
+               kwargs = msg.get("kwargs", {})
+               
+               func = getattr(plugin_module, action)
+               result = func(**kwargs)
+               
+               pipe.send({"status": "OK", "data": result})
+            except Exception as e:
+               pipe.send({"status": "ERROR", "error": str(e)})
 
-    def mount_plugin(self, name: str, plugin_class: Type, required_methods: list = None, requires_pqc: bool = False) -> bool:
-        """
-        Registers a plugin, checking compliance and hardware limits before mounting.
-        """
-        # 1. Hardware Threshold Check
-        if requires_pqc and not self._system_profile.get("permit_hybrid_pqc", False):
-            self.logger.warning(f"  [REJECTED] Plugin '{name}' requires Post-Quantum Crypto. Blocked by Tier 3 Hardware Profile.")
-            return False
-
-        # 2. Interface Compliance Check
-        if required_methods:
-            for method in required_methods:
-                if not hasattr(plugin_class, method) or not callable(getattr(plugin_class, method)):
-                    self.logger.error(f"  [REJECTED] Plugin '{name}' failed compliance. Missing required method: {method}()")
-                    return False
+    def dispatch(self, plugin_name: str, action: str, **kwargs):
+        """Commands the isolated plugin and returns the result."""
+        if plugin_name not in self.plugins:
+            raise ValueError(f"Capability '{plugin_name}' is offline.")
+            
+        pipe = self.plugins[plugin_name]["pipe"]
+        pipe.send({"action": action, "kwargs": kwargs})
         
-        # 3. Mount into Sandbox
-        plugin_instance = plugin_class()
-        
-        # Pass necessary limits directly to the plugin if it can accept them
-        if hasattr(plugin_instance, "apply_hardware_limits"):
-            plugin_instance.apply_hardware_limits(self._system_profile)
-
-        self._plugins[name] = PluginSandbox(plugin_instance, name)
-        self.logger.info(f"  [MOUNTED] Plugin '{name}' sandboxed and compliant.")
-        return True
-
-    def get_plugin_interface(self, name: str) -> PluginSandbox:
-        if name not in self._plugins:
-            raise ValueError(f"Plugin '{name}' is not mounted on the Registry Bus.")
-        return self._plugins[name]
+        response = pipe.recv()
+        if response["status"] == "ERROR":
+            raise Exception(f"Plugin Panic ({plugin_name}): {response['error']}")
+            
+        return response["data"]
