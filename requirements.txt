@@ -2,4 +2,5 @@
 argon2
 cryptography==47.0.0
 environment
+oqs
 psutil==7.2.2
