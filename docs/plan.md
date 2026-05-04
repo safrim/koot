@@ -24,10 +24,13 @@ This plan is strictly organized into logical, one-session milestones that should
 
 #### **Phase 2: Quantum-Safe Cryptography**
 
-* **Session 5: Hardware-Aware Classical Crypto.** Implement AES-256-GCM[]. Write the logic so it utilizes hardware acceleration if the Environment Sensor detects it, or defaults to a software fallback if not[].
-* **Session 6: Post-Quantum (PQC) Layer.** Integrate a lattice-based library like liboqs to implement ML-KEM (Kyber) for quantum-resistant key encapsulation[].
-* **Session 7: The Hybrid Combiner.** Develop the logic to securely hash the AES key and the Kyber key together using SHA-3, forming the ultimate session key[].
-* **[Engineered Countermeasure: The KDF Standard] (Session 7 Addendum):** Do not write a custom hash combiner[]. Implement a standardized Key Derivation Function (KDF) like HKDF (HMAC-based Extract-and-Expand Key Derivation Function)[]. Ensure it safely extracts a uniformly random, cryptographically strong session key without bleeding information[].
+    * **Session 5: Hardware-Aware Classical Crypto.** Implement AES-256-GCM[]. Write the logic so it utilizes hardware acceleration if the Environment Sensor detects it, or defaults to a software fallback if not[].
+
+    * **Session 6: Post-Quantum (PQC) Layer.** Integrate a lattice-based library like liboqs to implement ML-KEM (Kyber) for quantum-resistant key encapsulation[].
+
+    * **Session 7: The Hybrid Combiner.** Develop the logic to securely hash the AES key and the Kyber key together using SHA-3, forming the ultimate session key[].
+
+        * **[Engineered Countermeasure: The KDF Standard] (Session 7 Addendum):** Do not write a custom hash combiner[]. Implement a standardized Key Derivation Function (KDF) like HKDF (HMAC-based Extract-and-Expand Key Derivation Function)[]. Ensure it safely extracts a uniformly random, cryptographically strong session key without bleeding information[].
 
 #### **Phase 3: Media Handling & Multi-Backend Storage**
 
