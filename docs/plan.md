@@ -34,8 +34,10 @@ This plan is strictly organized into logical, one-session milestones that should
 
 #### **Phase 3: Media Handling & Multi-Backend Storage**
 
-* **Session 8: The Adaptive Chunking Engine.** Write a stream processor to handle large files in 64KB blocks[]. Tie this directly to the Environment Sensor so the chunk size scales down dynamically if the system RAM drops[].
-* **[Engineered Countermeasure: Predictive Ramp-Up] (Session 8 Addendum):** Do not wait for the OS to report high heat/memory usage[]. Implement a conservative "TCP Slow Start" methodology for the Chunking Engine[]. Start with the safest, smallest chunk size (e.g., 16KB) and progressively scale up to 64KB only if the hardware proves stable over a sustained period of streaming[].
+    * **Session 8: The Adaptive Chunking Engine.** Write a stream processor to handle large files in 64KB blocks[]. Tie this directly to the Environment Sensor so the chunk size scales down dynamically if the system RAM drops[].
+
+        * **[Engineered Countermeasure: Predictive Ramp-Up] (Session 8 Addendum):** Do not wait for the OS to report high heat/memory usage[]. Implement a conservative "TCP Slow Start" methodology for the Chunking Engine[]. Start with the safest, smallest chunk size (e.g., 16KB) and progressively scale up to 64KB only if the hardware proves stable over a sustained period of streaming[].
+
 * **Session 9: Merkle Tree Integrity.** Implement the hash-tree generator to cryptographically link all chunks, storing the root hash securely in the Envelope header[].
 * **[Engineered Countermeasure: Lazy Verification & Caching] (Session 9 Addendum):** Do not verify the entire 10GB tree before playing a video[]. Implement "Streaming Verification"[]. Calculate the hash only for the specific 64KB chunk being actively accessed and check its specific branch against the Root Hash in the header[].
 * **Session 10: Storage Adapters.** Build the abstract StorageDriver interface[]. Implement the initial Local Filesystem and SQLite drivers[].
