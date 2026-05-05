@@ -42,7 +42,8 @@ This plan is strictly organized into logical, one-session milestones that should
 
         * **[Engineered Countermeasure: Lazy Verification & Caching] (Session 9 Addendum):** Do not verify the entire 10GB tree before playing a video[]. Implement "Streaming Verification"[]. Calculate the hash only for the specific 64KB chunk being actively accessed and check its specific branch against the Root Hash in the header[].
 
-* **Session 10: Storage Adapters.** Build the abstract StorageDriver interface[]. Implement the initial Local Filesystem and SQLite drivers[].
+    * **Session 10: Storage Adapters.** Build the abstract StorageDriver interface[]. Implement the initial Local Filesystem and SQLite drivers[].
+    
 * **Session 11: Live Migration Utility.** Create the tool to read Envelopes from one Storage Adapter and write them to another, enabling seamless multi-cloud mirroring capabilities[].
 * **[Engineered Countermeasure: Differential Syncing] (Session 11 Addendum):** Implement rsync-style differential mirroring[]. Program the utility to compare the Merkle Trees of "Backend A" and "Backend B"[]. Only transmit the specific 64KB chunks that have changed or are missing, rather than re-uploading the whole file[].
 
