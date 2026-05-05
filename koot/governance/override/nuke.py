@@ -4,6 +4,7 @@ import shutil
 import logging
 from pathlib import Path
 from typing import Callable, Optional
+from koot.governance.override.interlock import OverrideMatrix
 
 class NukeProtocol:
     """
@@ -11,7 +12,14 @@ class NukeProtocol:
     If the heartbeat is not received within the timeout period, the system 
     executes the emergency response (wiping or locking).
     """
-    def __init__(self, target_path: Optional[str] = None, emergency_callback: Optional[Callable] = None):
+    def __init__(
+        self, 
+        override_matrix: OverrideMatrix,
+        target_path: Optional[str] = None, 
+        emergency_callback: Optional[Callable] = None
+    ):
+        # Integration: Inject the Override Matrix to allow manual halts
+        self.matrix = override_matrix
         self.target_path = Path(target_path) if target_path else None
         self.emergency_callback = emergency_callback
         self.timeout = 0
@@ -51,6 +59,13 @@ class NukeProtocol:
         """Background loop to check if the timeout has expired."""
         while not self._stop_event.is_set():
             if not self.is_armed:
+                break
+            
+            # Step 2: The Halt Guard
+            # If the manual override interlock is engaged, stop the monitor immediately
+            if self.matrix.is_halted:
+                self.logger.info("Nuke Protocol HALTED by Manual Override Interlock.")
+                self.is_armed = False
                 break
                 
             elapsed = time.time() - self.last_heartbeat
