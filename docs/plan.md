@@ -59,7 +59,9 @@ This plan is strictly organized into logical, one-session milestones that should
 #### **Phase 5: Telemetry, Governance & Override**
 
     * **Session 15: Analytics & Telemetry Engine.** Build a passive observer plugin that logs throughput, encryption times, and memory usage, outputting a real-time JSON state report[].
-    
-* **Session 16: Immutable Audit & "Nuke" Protocol.** Implement the append-only access log[]. Build the "Dead Man's Switch" module for automated vault wiping or locking during a detected breach[].
-* **[Engineered Countermeasure: Cryptographic Log Rotation] (Session 16 Addendum):** Implement epoch-based sealing[]. Write logic so that once the log hits a certain size (e.g., 50MB), the system computes a final hash of that log, "seals" it into cold storage, and starts a new active log file[]. The first entry of the new log must contain the final hash of the old log, maintaining an unbroken cryptographic chain[].
-* **Session 17: The Manual Override Matrix.** Create a high-priority command interface that requires an Admin token[]. This interface must be able to instantly halt migrations, pause self-healing operations, or abort a "Nuke" countdown[].
+
+    * **Session 16: Immutable Audit & "Nuke" Protocol.** Implement the append-only access log[]. Build the "Dead Man's Switch" module for automated vault wiping or locking during a detected breach[].
+        
+        * **[Engineered Countermeasure: Cryptographic Log Rotation] (Session 16 Addendum):** Implement epoch-based sealing[]. Write logic so that once the log hits a certain size (e.g., 50MB), the system computes a final hash of that log, "seals" it into cold storage, and starts a new active log file[]. The first entry of the new log must contain the final hash of the old log, maintaining an unbroken cryptographic chain[].
+
+    * **Session 17: The Manual Override Matrix.** Create a high-priority command interface that requires an Admin token[]. This interface must be able to instantly halt migrations, pause self-healing operations, or abort a "Nuke" countdown[].
