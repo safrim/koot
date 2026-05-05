@@ -28,3 +28,4 @@ env/
 # miscellaneous
 /docs/keywords_and_phrases.md
 *.vault
+/certs

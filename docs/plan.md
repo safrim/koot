@@ -54,7 +54,7 @@ This plan is strictly organized into logical, one-session milestones that should
     
     * **Session 13: Zero-Trust Network Gateway.** Implement the mTLS listener for remote access, strictly requiring and validating X.509 Client Certificates[].
 
-* **Session 14: Machine Identity.** Create the module to read a TPM 2.0 signature, allowing a larger host system to unlock the vault without requiring a human password[].
+    * **Session 14: Machine Identity.** Create the module to read a TPM 2.0 signature, allowing a larger host system to unlock the vault without requiring a human password[].
 
 #### **Phase 5: Telemetry, Governance & Override**
 
