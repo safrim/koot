@@ -2,6 +2,9 @@ import json
 import base64
 from dataclasses import dataclass, asdict
 from typing import Dict, Any
+from koot.storage.chunking.buffered_adaptive import BufferedAdaptiveChunker
+from koot.storage.integrity.merkle import MerkleTree
+
 
 @dataclass
 class EnvelopeHeader:
@@ -50,3 +53,15 @@ class SecretEnvelope:
 
     def __repr__(self):
         return f"<SecretEnvelope Type:{self.header.content_type} Version:{self.header.version}>"
+    
+def process_file_for_storage(file_path: str):
+    chunker = BufferedAdaptiveChunker()
+    tree = MerkleTree()
+
+    for chunk in chunker.process_stream(file_path):
+        tree.add_chunk(chunk)
+
+    tree.build()
+    header_root_hash = tree.get_root_hash()
+    
+    return header_root_hash
