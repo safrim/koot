@@ -50,8 +50,10 @@ This plan is strictly organized into logical, one-session milestones that should
 
 #### **Phase 4: Connectivity & Zero-Trust Integration**
 
-* **Session 12: Local Subsystem Gateway (IPC).** Build a Unix Domain Socket or Named Pipe server to allow host applications to request vaulting services locally[].
-* **Session 13: Zero-Trust Network Gateway.** Implement the mTLS listener for remote access, strictly requiring and validating X.509 Client Certificates[].
+    * **Session 12: Local Subsystem Gateway (IPC).** Build a Unix Domain Socket or Named Pipe server to allow host applications to request vaulting services locally[].
+    
+    * **Session 13: Zero-Trust Network Gateway.** Implement the mTLS listener for remote access, strictly requiring and validating X.509 Client Certificates[].
+
 * **Session 14: Machine Identity.** Create the module to read a TPM 2.0 signature, allowing a larger host system to unlock the vault without requiring a human password[].
 
 #### **Phase 5: Telemetry, Governance & Override**
