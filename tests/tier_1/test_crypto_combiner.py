@@ -67,5 +67,42 @@ class TestHybridCombiner(unittest.TestCase):
         self.assertNotEqual(original_key, quantum_tamper_result, "Quantum key tampering failed to trigger the avalanche effect.")
         self.assertNotEqual(classical_tamper_result, quantum_tamper_result)
 
+    def test_concatenation_collision_prevention(self):
+        """
+        [Countermeasure Verification]
+        Proves that two distinct sets of keys that would normally concatenate 
+        to the exact same byte string do NOT result in the same session key,
+        thanks to strict length prefixing.
+        """
+        # Scenario: Two different pairs of keys that concatenate to b"123456"
+        # Pair A: "123" + "456"
+        c_key_a = b"123"
+        q_key_a = b"456"
+        
+        # Pair B: "12" + "3456"
+        c_key_b = b"12"
+        q_key_b = b"3456"
+        
+        # Under raw concatenation, c_key_a + q_key_a == c_key_b + q_key_b
+        # But our system should prevent this.
+        
+        key_a_result = HybridCombiner.derive_session_key(
+            c_key_a, 
+            q_key_a, 
+            salt=self.salt
+        )
+        
+        key_b_result = HybridCombiner.derive_session_key(
+            c_key_b, 
+            q_key_b, 
+            salt=self.salt
+        )
+        
+        self.assertNotEqual(
+            key_a_result, 
+            key_b_result, 
+            "CRITICAL: Length-prefixing failed. The system is vulnerable to concatenation collision attacks."
+        )
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
