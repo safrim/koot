@@ -29,3 +29,4 @@ env/
 /docs/keywords_and_phrases.md
 *.vault
 /certs
+/data

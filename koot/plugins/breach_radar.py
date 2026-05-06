@@ -1,84 +1,104 @@
 # koot/plugins/breach_radar.py
 import hashlib
 import math
+import mmap
+import os
+import logging
 
 class BreachRadarPlugin:
     """
-    Offline Breach Radar (Local Bloom Filters).
+    Offline Breach Radar (Opt-In).
     Countermeasure: Privacy-Preserving Breach Detection.
-    Allows koot to query if a password has been compromised using a 
-    highly compressed local probabilistic data structure.
+    
+    Dynamically scales between:
+    - Maximum Security: 1.3 Billion Items (HIBP) via Disk-Backing (mmap).
+    - Efficiency: 15 Million Items (RockYou) via Disk-Backing (mmap).
     """
     
-    def __init__(self, expected_items: int = 1000000, fp_rate: float = 0.001):
+    def __init__(self, environment_sensor, is_enabled: bool = False, filepath="data/breach_radar.bin"):
         """
-        Initializes the Bloom Filter.
-        :param expected_items: The estimated number of breached passwords to ingest.
-        :param fp_rate: The acceptable false-positive probability (e.g., 0.1%).
+        :param environment_sensor: koot's core hardware sensor.
+        :param is_enabled: User opt-in flag (defaults to False/Dormant).
+        :param filepath: Path to the persistent Bloom Filter binary.
         """
-        self.expected_items = expected_items
-        self.fp_rate = fp_rate
+        self.is_enabled = is_enabled
+        self.sensor = environment_sensor
+        self.filepath = os.path.abspath(filepath)
         
-        # Calculate optimal bit array size (m) and hash function count (k)
+        # Internal state
+        self.dataset_type = "dormant"
+        self.m = 0 
+        self.k = 0 
+        self.bit_array = None
+        self.file_obj = None
+        
+        if self.is_enabled:
+            self._configure_based_on_hardware()
+
+    def _configure_based_on_hardware(self):
+        """Fulfills koot's 'Hardware-Driven Loading' principle."""
+        available_disk = self.sensor.get_available_disk_mb()
+        
+        # MODE A: HIBP Full - 1.3 Billion Items
+        # Requires ~1.56 GB Disk, ~0 MB RAM
+        if available_disk > 10000: # 10GB safety buffer
+            self.dataset_type = "hibp_full"
+            expected_items = 1300000000 
+            fp_rate = 0.01
+        # MODE B: RockYou Lite - 15 Million Items (Full RockYou list coverage)
+        # Requires ~26 MB Disk, ~0 MB RAM
+        else:
+            self.dataset_type = "rockyou_lite"
+            expected_items = 15000000
+            fp_rate = 0.001
+
         self.m = self._calculate_size(expected_items, fp_rate)
         self.k = self._calculate_hash_count(self.m, expected_items)
         
-        # Using bytearray for memory-efficient bit manipulation
-        self.bit_array = bytearray((self.m + 7) // 8)
+        self._mount_disk_filter()
+        logging.info(f"Breach Radar: Initialized {self.dataset_type} at {self.filepath}")
 
-    def _calculate_size(self, n: int, p: float) -> int:
-        """Returns optimal size of bit array (m)."""
-        return int(-(n * math.log(p)) / (math.log(2) ** 2))
-
-    def _calculate_hash_count(self, m: int, n: int) -> int:
-        """Returns optimal number of hash functions (k)."""
-        return int((m / n) * math.log(2))
-
-    def _get_positions(self, password: str) -> list[int]:
-        """
-        Uses the Kirsch-Mitzenmacher optimization to derive k hash functions 
-        from a single SHA-1 base hash.
-        """
-        base_hash = hashlib.sha1(password.encode('utf-8')).digest()
+    def _mount_disk_filter(self):
+        """Creates the sparse file on disk and memory-maps it."""
+        byte_size = (self.m + 7) // 8
+        os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
         
-        # Split the 160-bit SHA-1 hash into two 32-bit integers
-        hash1 = int.from_bytes(base_hash[:4], 'big')
-        hash2 = int.from_bytes(base_hash[4:8], 'big')
-        
-        positions = []
-        for i in range(self.k):
-            # h_i(x) = (h1(x) + i * h2(x)) % m
-            pos = (hash1 + i * hash2) % self.m
-            positions.append(pos)
-            
-        return positions
-
-    def _set_bit(self, pos: int):
-        byte_index = pos // 8
-        bit_index = pos % 8
-        self.bit_array[byte_index] |= (1 << bit_index)
-
-    def _get_bit(self, pos: int) -> bool:
-        byte_index = pos // 8
-        bit_index = pos % 8
-        return (self.bit_array[byte_index] & (1 << bit_index)) != 0
+        if not os.path.exists(self.filepath):
+            with open(self.filepath, "wb") as f:
+                f.seek(byte_size - 1)
+                f.write(b'\0')
+                
+        self.file_obj = open(self.filepath, "r+b")
+        self.bit_array = mmap.mmap(self.file_obj.fileno(), 0)
 
     def ingest_compromised_password(self, password: str):
-        """Adds a compromised password to the local Bloom Filter."""
+        if not self.is_enabled or self.bit_array is None: return
         for pos in self._get_positions(password):
-            self._set_bit(pos)
+            self.bit_array[pos // 8] |= (1 << (pos % 8))
 
     def is_compromised(self, password: str) -> bool:
-        """
-        Checks if a password is in the Bloom Filter.
-        Returns True if PROBABLY compromised.
-        Returns False if DEFINITELY NOT compromised.
-        """
+        if not self.is_enabled or self.bit_array is None: return False
         for pos in self._get_positions(password):
-            if not self._get_bit(pos):
+            if (self.bit_array[pos // 8] & (1 << (pos % 8))) == 0:
                 return False
         return True
-        
-    def check_capabilities(self) -> bool:
-        """Fulfills a basic signature check for ContractEnforcer."""
-        return True
+
+    def _get_positions(self, password: str) -> list[int]:
+        """Kirsch-Mitzenmacher optimization for efficient hashing."""
+        base_hash = hashlib.sha1(password.encode('utf-8', errors='ignore')).digest()
+        h1 = int.from_bytes(base_hash[:4], 'big')
+        h2 = int.from_bytes(base_hash[4:8], 'big')
+        return [(h1 + i * h2) % self.m for i in range(self.k)]
+
+    def check_capabilities(self): return self.is_enabled
+
+    def close(self):
+        """Safely flushes and unmounts the filter."""
+        if hasattr(self, 'bit_array') and self.bit_array:
+            self.bit_array.flush()
+            self.bit_array.close()
+        if hasattr(self, 'file_obj') and self.file_obj:
+            self.file_obj.close()
+
+    def _calculate_size(self, n, p): return int(-(n * math.log(p)) / (math.log(2) ** 2))
+    def _calculate_hash_count(self, m, n): return int((m / n) * math.log(2))
