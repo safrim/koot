@@ -1,11 +1,50 @@
+import os
+import json
 import uuid
 import multiprocessing
+from multiprocessing.connection import Connection
 import logging
+from typing import Any, Dict
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from .environment import EnvironmentSensor
 # from .contracts import ContractEnforcer  # Assuming we implement this later
 
 # Configure basic timely notifications
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+
+class SecurePipeConnection:
+    """
+    A transparent, cryptographically secure wrapper for multiprocessing.Pipe.
+    Utilizes ChaCha20-Poly1305 for fast, authenticated symmetric encryption.
+    """
+    def __init__(self, conn: Connection, key: bytes):
+        if len(key) != 32:
+            raise ValueError("ChaCha20-Poly1305 requires a 32-byte key.")
+        self._conn = conn
+        self._chacha = ChaCha20Poly1305(key)
+
+    def send(self, data: Dict[str, Any]) -> None:
+        """Encrypts and transmits a JSON-serializable dictionary."""
+        nonce = os.urandom(12) # 96-bit nonce as required by ChaCha20
+        plaintext = json.dumps(data).encode('utf-8')
+        
+        # Authenticated encryption (ciphertext includes the MAC tag)
+        ciphertext = self._chacha.encrypt(nonce, plaintext, None)
+        
+        # Transmit the plaintext nonce and the ciphertext over the raw pipe
+        self._conn.send((nonce, ciphertext))
+
+    def recv(self) -> Dict[str, Any]:
+        """Receives and decrypts data from the pipe."""
+        nonce, ciphertext = self._conn.recv()
+        
+        # Decrypts and verifies the MAC tag simultaneously
+        plaintext = self._chacha.decrypt(nonce, ciphertext, None)
+        return json.loads(plaintext.decode('utf-8'))
+
+    def close(self) -> None:
+        self._conn.close()
+
 
 class AdaptiveRegistry:
     """
@@ -81,35 +120,47 @@ class AdaptiveRegistry:
         try:
             parent_conn, child_conn = multiprocessing.Pipe()
             
+            # [COUNTERMEASURE INJECTED]: Generate a volatile 32-byte session key
+            volatile_session_key = os.urandom(32)
+            
             process = multiprocessing.Process(
                 target=self._actor_loop, 
-                args=(child_conn, plugin_module),
+                args=(child_conn, plugin_module, volatile_session_key),
                 daemon=True
             )
             process.start()
             
             self.plugins[name] = {
-                "pipe": parent_conn,
+                "pipe": SecurePipeConnection(parent_conn, volatile_session_key),
                 "process": process
             }
-            logging.info(f"Mounted isolated capability: '{name}' (PID: {process.pid})")
+            logging.info(f"Mounted isolated capability: '{name}' (PID: {process.pid}) [SECURE IPC ACTIVE]")
         except Exception as e:
             logging.error(f"Failed to mount capability '{name}': {e}")
 
-    def _actor_loop(self, pipe, plugin_module):
+    def _actor_loop(self, raw_pipe, plugin_module, session_key):
         """The isolated execution field for the plugin (Zero-Shared Memory)."""
+        secure_pipe = SecurePipeConnection(raw_pipe, session_key)
+        
         while True:
             try:
-               msg = pipe.recv()
+               msg = secure_pipe.recv()
                action = msg.get("action")
+               
+               # Safe exit mechanism added for graceful termination
+               if action == "SHUTDOWN":
+                   break
+                   
                kwargs = msg.get("kwargs", {})
                
                func = getattr(plugin_module, action)
                result = func(**kwargs)
                
-               pipe.send({"status": "OK", "data": result})
+               secure_pipe.send({"status": "OK", "data": result})
             except Exception as e:
-               pipe.send({"status": "ERROR", "error": str(e)})
+               secure_pipe.send({"status": "ERROR", "error": str(e)})
+               
+        secure_pipe.close()
 
     def dispatch(self, plugin_name: str, action: str, **kwargs):
         """Commands the isolated plugin and returns the result."""
@@ -124,3 +175,14 @@ class AdaptiveRegistry:
             raise Exception(f"Plugin Panic ({plugin_name}): {response['error']}")
             
         return response["data"]
+
+    def shutdown_all(self):
+        """Safely terminates all plugin processes."""
+        for name, p_data in self.plugins.items():
+            try:
+                p_data["pipe"].send({"action": "SHUTDOWN"})
+                p_data["process"].join(timeout=2.0)
+                if p_data["process"].is_alive():
+                    p_data["process"].terminate()
+            except Exception as e:
+                logging.error(f"Error shutting down {name}: {e}")
