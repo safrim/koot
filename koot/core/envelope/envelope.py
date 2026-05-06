@@ -1,7 +1,9 @@
 import json
 import base64
+import hmac
+import hashlib
 from dataclasses import dataclass, asdict
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from koot.storage.chunking.buffered_adaptive import BufferedAdaptiveChunker
 from koot.storage.integrity.merkle import MerkleTree
 
@@ -17,6 +19,7 @@ class EnvelopeHeader:
     crypto_suite_id: str
     iv: str  # Base64 encoded Initialization Vector / Nonce
     merkle_root: str  # Base64 encoded Root Hash for integrity
+    expires_at: Optional[float] = None  # Unix timestamp for TTL (Ghost Plugin)
 
 class SecretEnvelope:
     """
@@ -27,13 +30,22 @@ class SecretEnvelope:
         self.header = header
         self.payload = payload  # Raw encrypted bytes
 
-    def serialize(self) -> bytes:
+    def serialize(self, vault_mac_key: bytes) -> bytes:
         """
         Packs the Envelope into a standardized JSON/Binary structure.
-        The payload is Base64 encoded to safely reside within JSON.
+        Cryptographically signs the metadata (header) so background workers 
+        can verify it without needing to decrypt the payload.
         """
+        header_dict = asdict(self.header)
+        # Sort keys to ensure deterministic byte output for the HMAC
+        header_json_bytes = json.dumps(header_dict, sort_keys=True).encode('utf-8')
+        
+        # Generate an HMAC-SHA256 signature of the header using the Vault Key
+        header_mac = hmac.new(vault_mac_key, header_json_bytes, hashlib.sha256).hexdigest()
+        
         data = {
-            "header": asdict(self.header),
+            "header": header_dict,
+            "header_mac": header_mac,  # Cryptographic Proof of Integrity
             "payload": base64.b64encode(self.payload).decode('utf-8')
         }
         return json.dumps(data).encode('utf-8')
@@ -42,10 +54,17 @@ class SecretEnvelope:
     def deserialize(cls, data: bytes) -> 'SecretEnvelope':
         """
         Unpacks a serialized Envelope byte string back into a SecretEnvelope object.
+        Supports backwards compatibility for missing expires_at.
         """
         try:
             parsed = json.loads(data.decode('utf-8'))
-            header = EnvelopeHeader(**parsed["header"])
+            header_data = parsed.get("header", {})
+            
+            # Forward compatibility for older envelopes without TTL
+            if "expires_at" not in header_data:
+                header_data["expires_at"] = None
+                
+            header = EnvelopeHeader(**header_data)
             payload = base64.b64decode(parsed["payload"])
             return cls(header=header, payload=payload)
         except (json.JSONDecodeError, KeyError, TypeError) as e:
@@ -55,6 +74,9 @@ class SecretEnvelope:
         return f"<SecretEnvelope Type:{self.header.content_type} Version:{self.header.version}>"
     
 def process_file_for_storage(file_path: str):
+    """
+    Phase 3 Media Handling Helper
+    """
     chunker = BufferedAdaptiveChunker()
     tree = MerkleTree()
 

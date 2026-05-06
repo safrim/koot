@@ -1,4 +1,4 @@
-### **koot: Codebase Remediation Plan (Plan 2)**
+### **koot: Codebase Remediation Plan **
 
 #### **Phase 1: Remediation of The Adaptive Core & Entropy**
 
