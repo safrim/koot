@@ -1,4 +1,8 @@
 import os
+import psutil
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BufferedAdaptiveChunker:
     """
@@ -16,11 +20,40 @@ class BufferedAdaptiveChunker:
 
     def _evaluate_hardware(self):
         """
-        Simulates hardware evaluation. 
-        Adjusts self.current_physical_size based on RAM/Thermal pressure.
+        Evaluates real-time system memory to dynamically throttle physical read sizes.
+        Countermeasure against OOM crashes on memory-constrained devices while maintaining
+        strict logical boundaries for cryptographic operations.
         """
-        # Example logic: Drop to 16KB if memory is low, otherwise scale up
-        pass
+        try:
+            # Probe real-time virtual memory statistics
+            mem = psutil.virtual_memory()
+            available_mb = mem.available / (1024 * 1024)
+
+            if available_mb < 512:
+                # Critical RAM: Extremely aggressive throttling
+                # Limit physical reads to 16KB
+                if self.current_physical_size != 16384:
+                    logger.warning("CRITICAL: Low memory detected. Throttling disk I/O to 16KB reads.")
+                    self.current_physical_size = 16384
+                
+            elif available_mb < 2048:
+                # Constrained RAM
+                # Limit physical reads to 64KB
+                if self.current_physical_size != 65536:
+                    logger.info("Constrained memory detected. Scaling disk I/O to 64KB reads.")
+                    self.current_physical_size = 65536
+                
+            else:
+                # Abundant RAM: Optimize for speed and lower I/O overhead
+                # Read 1MB physical chunks at a time
+                if self.current_physical_size != 1048576:
+                    self.current_physical_size = 1048576
+                
+        except Exception as e:
+            # Failsafe: If telemetry fails, default to a highly defensive posture (16KB reads)
+            if self.current_physical_size != 16384:
+                logger.error(f"Hardware sensor evaluation failed: {e}. Defaulting to safe 16KB reads.")
+                self.current_physical_size = 16384
 
     def process_stream(self, file_path: str):
         """
