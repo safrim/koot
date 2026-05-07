@@ -38,6 +38,7 @@ This plan seamlessly attaches to the end of our previous roadmap, maintaining th
 #### Phase 6: Utility Modules & Interoperability
 * **Session 18: Cryptographic Generators Plugin.** * *Action:* Build a `GeneratorPlugin`. Implement a `PasswordGenerator` using os-level CSPRNGs (Cryptographically Secure Pseudorandom Number Generators). Implement a `PassphraseGenerator` (Diceware) that maps CSPRNG rolls to a localized EFF wordlist.
     * *Outcome:* The koot API can now receive requests like `GET /generate/passphrase?words=6`.
+    
 * **Session 19: The Import/Translation Engine.** * *Action:* Build a parser module that takes exported, plaintext CSV/JSON files from Bitwarden, 1Password, or LastPass. The engine maps their schemas to koot's **Dynamic Schema Matrix**, chunks the data, wraps them in Envelopes, and pumps them into the local Storage Adapter.
 * **Session 20: The Export & Escrow Utility.** * *Action:* Implement a secure export utility. It reads selected Envelopes, decrypts them in volatile memory, and packages them into a standardized, encrypted `koot-archive` format, or a plaintext CSV (with a giant warning prompt via the Override Matrix).
 
