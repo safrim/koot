@@ -55,8 +55,8 @@ Here is the finalized, secure implementation plan for the **Stealth Multi-Tenant
 *Automating the monitoring and policing of your operatives securely.*
 
 **Session 7: Tenant-Aware Analytics**
-* **Objective:** Upgrade telemetry to track *who* is doing what.
-* **Action:** Refactor `koot/governance/analytics/observer.py`. Intercept the `tenant_id` from the Registry Bus. Tag data throughput metrics, encryption timing, and schema access requests with the specific user's ID.
+    * **Objective:** Upgrade telemetry to track *who* is doing what.
+    * **Action:** Refactor `koot/governance/analytics/observer.py`. Intercept the `tenant_id` from the Registry Bus. Tag data throughput metrics, encryption timing, and schema access requests with the specific user's ID.
 
 **Session 8: Heuristic Triggers & Baselines**
 * **Objective:** Teach the Analytics Engine what a "threat" looks like.
