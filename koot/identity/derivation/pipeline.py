@@ -54,7 +54,7 @@ class EntropyPipeline:
                 memory_cost=self.memory_cost,
                 parallelism=self.parallelism,
                 hash_len=self.hash_len,
-                type=argon2.low_level.Type.ID  # <--- FIX: Changed from ARGON2ID to ID
+                type=argon2.low_level.Type.ID 
             )
             return raw_key, salt
             
@@ -63,3 +63,13 @@ class EntropyPipeline:
             del secret_bytes
             del secret
             gc.collect()
+
+    def generate_tenant_master_key(self) -> bytes:
+        """
+        Generates a true mathematically random 256-bit (32-byte) key for a sub-tenant.
+        This ensures cryptographic isolation without deriving keys from public mTLS certificates.
+        """
+        # Generates exactly 32 bytes of high-entropy randomness via os.urandom()
+        # This key will be held strictly in volatile memory during active mTLS sessions
+        # and Escrowed (wrapped by the Master Key) in the Shadow Ledger at rest.
+        return os.urandom(32)

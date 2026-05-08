@@ -11,7 +11,7 @@ class MockHighRamSensor:
         return {"ram_gb": 32.0} # Simulate 32 GB RAM
 
 class TestEntropyPipeline(unittest.TestCase):
-    # ... (keep all the test functions exactly as they are) ...
+    
     def test_hardware_aware_scaling(self):
         """Proves the pipeline scales Argon2id memory costs based on available RAM."""
         # Test Low RAM IoT Scenario
@@ -39,6 +39,22 @@ class TestEntropyPipeline(unittest.TestCase):
         
         # The cryptographic keys must match exactly
         self.assertEqual(key1, key2)
+
+    def test_generate_tenant_master_key_entropy(self):
+        """
+        Proves that tenant master keys are purely random, mathematically distinct, 
+        and strictly 32 bytes (256-bit) to ensure flawless isolation.
+        """
+        pipeline = EntropyPipeline()
+        key1 = pipeline.generate_tenant_master_key()
+        key2 = pipeline.generate_tenant_master_key()
+        
+        # Keys must be exactly 256 bits (32 bytes) for AES-256 and Kyber ingestion
+        self.assertEqual(len(key1), 32)
+        self.assertEqual(len(key2), 32)
+        
+        # Keys must be distinct, proving we are not returning a static or predictable buffer
+        self.assertNotEqual(key1, key2)
 
 if __name__ == '__main__':
     unittest.main()
