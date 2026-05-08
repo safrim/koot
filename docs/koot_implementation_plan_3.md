@@ -22,13 +22,13 @@ Here is the finalized, secure implementation plan for the **Stealth Multi-Tenant
     * **Outcome:** A thread-safe, dormant database defining sub-user boundaries.
 
 **Session 2: Gateway Context Extraction**
-* **Objective:** Update the Zero-Trust Gateway to identify sub-users.
-* **Action:** Modify `koot/network/gateway/mtls_server.py`. Upon a successful TLS handshake, extract the hash of the client's X.509 certificate. If the hash is in the Shadow Ledger, attach the `tenant_id` and permissions to the active session state. If not, drop the connection immediately.
+    * **Objective:** Update the Zero-Trust Gateway to identify sub-users.
+    * **Action:** Modify `koot/network/gateway/mtls_server.py`. Upon a successful TLS handshake, extract the hash of the client's X.509 certificate. If the hash is in the Shadow Ledger, attach the `tenant_id` and permissions to the active session state. If not, drop the connection immediately.
 
 **Session 3: Cryptographic Vault Partitions (True Entropy Generation)**
-* **Objective:** Ensure sub-users cannot decrypt your data, using mathematically random keys.
-* **Action:** Modify `koot/identity/derivation/pipeline.py`. **Do not derive the key from the certificate.** Instead, configure the system so that each tenant receives a truly random 256-bit `tenant_master_key` generated via `os.urandom()` upon creation. This key is held only in volatile memory during their active mTLS session.
-* **Outcome:** Cryptographically flawless isolation for each user partition.
+    * **Objective:** Ensure sub-users cannot decrypt your data, using mathematically random keys.
+    * **Action:** Modify `koot/identity/derivation/pipeline.py`. **Do not derive the key from the certificate.** Instead, configure the system so that each tenant receives a truly random 256-bit `tenant_master_key` generated via `os.urandom()` upon creation. This key is held only in volatile memory during their active mTLS session.
+    * **Outcome:** Cryptographically flawless isolation for each user partition.
 
 **Session 4: Storage Tenant Segregation (Cryptographic Obfuscation)**
 * **Objective:** Physically separate storage chunks without leaking metadata on the disk.

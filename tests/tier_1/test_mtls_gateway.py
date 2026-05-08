@@ -3,15 +3,14 @@ import asyncio
 import ssl
 import logging
 import pytest
+from unittest.mock import MagicMock
 from koot.network.gateway.mtls_server import ZeroTrustGateway
 
-# Disable verbose logging for tests unless debugging
 logging.basicConfig(level=logging.INFO)
 
 HOST = '127.0.0.1'
 PORT = 8888
 
-# Assuming certs are generated in a 'certs' folder at the root
 CA_CERT = 'certs/ca.crt'
 SERVER_CERT = 'certs/server.crt'
 SERVER_KEY = 'certs/server.key'
@@ -21,19 +20,32 @@ ROGUE_CLIENT_CERT = 'certs/rogue_client.crt'
 ROGUE_CLIENT_KEY = 'certs/rogue_client.key'
 
 @pytest.fixture
-async def mtls_server():
-    gateway = ZeroTrustGateway(HOST, PORT, CA_CERT, SERVER_CERT, SERVER_KEY)
+def mock_ledger():
+    ledger = MagicMock()
+    # By default, allow access for a standard user mock
+    ledger.get_tenant.return_value = {
+        "tenant_id": "Operative_Alpha",
+        "permissions": ["READ", "WRITE"],
+        "locked": False
+    }
+    return ledger
+
+@pytest.fixture
+async def mtls_server(mock_ledger):
+    gateway = ZeroTrustGateway(HOST, PORT, CA_CERT, SERVER_CERT, SERVER_KEY, shadow_ledger=mock_ledger)
     task = asyncio.create_task(gateway.start())
-    await asyncio.sleep(0.5) # Allow server to bind
-    yield
+    await asyncio.sleep(0.5)
+    yield gateway, mock_ledger
     task.cancel()
     
 @pytest.mark.asyncio
-async def test_authorized_client_success(mtls_server):
-    """Test that a client with a valid CA-signed certificate is granted access."""
+async def test_authorized_and_registered_client_success(mtls_server):
+    """Test that a CA-signed cert that IS registered in the Shadow Ledger is granted access."""
+    gateway, mock_ledger = mtls_server
+    
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=CA_CERT)
     context.load_cert_chain(certfile=CLIENT_CERT, keyfile=CLIENT_KEY)
-    context.check_hostname = False # Bypass hostname check for local testing
+    context.check_hostname = False 
 
     reader, writer = await asyncio.open_connection(HOST, PORT, ssl=context)
     
@@ -41,48 +53,47 @@ async def test_authorized_client_success(mtls_server):
     await writer.drain()
     
     response = await reader.read(1024)
-    assert b"Acknowledged payload" in response
+    assert b"Acknowledged payload from 'Operative_Alpha'" in response
     
     writer.close()
     await writer.wait_closed()
 
 @pytest.mark.asyncio
-async def test_unauthorized_client_rejection(mtls_server):
-    """Test that a client lacking a valid cert is violently dropped at the TLS handshake."""
+async def test_unregistered_client_rejection(mtls_server):
+    """Test that a CA-signed cert that IS NOT in the Shadow Ledger gets dropped."""
+    gateway, mock_ledger = mtls_server
+    # Simulate the ledger not finding the cert hash
+    mock_ledger.get_tenant.return_value = None 
+    
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=CA_CERT)
-    # Loading the ROGUE client cert (signed by an unknown CA)
-    context.load_cert_chain(certfile=ROGUE_CLIENT_CERT, keyfile=ROGUE_CLIENT_KEY)
-    context.check_hostname = False
+    context.load_cert_chain(certfile=CLIENT_CERT, keyfile=CLIENT_KEY)
+    context.check_hostname = False 
 
-    try:
-        reader, writer = await asyncio.open_connection(HOST, PORT, ssl=context)
-        
-        writer.write(b"Hello Vault")
-        await writer.drain()
-        response = await reader.read(1024)
-        
-        # If no exception was thrown, the server must have severed the pipe, 
-        # resulting in an empty read (EOF).
-        assert response == b"", f"Security Breach! Server responded to rogue client: {response}"
-        
-    except (ssl.SSLError, ConnectionResetError, EOFError):
-        # If the OS/Python threw a hard error, the rejection also worked perfectly.
-        pass
+    reader, writer = await asyncio.open_connection(HOST, PORT, ssl=context)
+    writer.write(b"Hello Vault")
+    await writer.drain()
+    
+    response = await reader.read(1024)
+    # The server should drop the connection immediately, resulting in an empty EOF read
+    assert response == b"", "Breach! Server responded to unregistered sub-user."
 
 @pytest.mark.asyncio
-async def test_no_cert_client_rejection(mtls_server):
-    """Test that a standard TLS client (no client cert) is dropped."""
+async def test_locked_client_rejection(mtls_server):
+    """Test that a locked sub-user is actively dropped despite having a valid cert."""
+    gateway, mock_ledger = mtls_server
+    mock_ledger.get_tenant.return_value = {
+        "tenant_id": "Operative_Alpha",
+        "permissions": ["READ", "WRITE"],
+        "locked": True # Locked status
+    }
+    
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=CA_CERT)
-    context.check_hostname = False
+    context.load_cert_chain(certfile=CLIENT_CERT, keyfile=CLIENT_KEY)
+    context.check_hostname = False 
 
-    try:
-        reader, writer = await asyncio.open_connection(HOST, PORT, ssl=context)
-        
-        writer.write(b"Hello Vault")
-        await writer.drain()
-        response = await reader.read(1024)
-        
-        assert response == b"", f"Security Breach! Server responded to unauthenticated client: {response}"
-        
-    except (ssl.SSLError, ConnectionResetError, EOFError):
-        pass
+    reader, writer = await asyncio.open_connection(HOST, PORT, ssl=context)
+    writer.write(b"Hello Vault")
+    await writer.drain()
+    
+    response = await reader.read(1024)
+    assert response == b"", "Breach! Server responded to a LOCKED sub-user."
