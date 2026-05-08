@@ -63,8 +63,8 @@ Here is the finalized, secure implementation plan for the **Stealth Multi-Tenant
     * **Action:** Build a rule-evaluator in the Analytics engine with hard thresholds (e.g., `MAX_DOWNLOAD_VELOCITY = 500MB/hr`).
 
 **Session 9: The Localized Freeze Command**
-* **Objective:** Build the mechanism to silently neutralize a single user.
-* **Action:** Add a `trigger_localized_freeze(tenant_id)` method to `koot/governance/override/interlock.py`. This must instantly sever all active mTLS sockets for that specific `tenant_id` and toggle a `locked=True` flag in the Shadow Ledger.
+    * **Objective:** Build the mechanism to silently neutralize a single user.
+    * **Action:** Add a `trigger_localized_freeze(tenant_id)` method to `koot/governance/override/interlock.py`. This must instantly sever all active mTLS sockets for that specific `tenant_id` and toggle a `locked=True` flag in the Shadow Ledger.
 
 **Session 10: Autonomous Self-Defense (Anti-DoS Bridging)**
 * **Objective:** Let the system defend itself without allowing attackers to weaponize the defense.

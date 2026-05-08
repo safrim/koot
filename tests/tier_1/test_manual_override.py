@@ -62,3 +62,39 @@ def test_reset_functionality(admin_creds):
     matrix.trigger_global_halt(token, master_hash)
     matrix.reset_halt(token, master_hash)
     assert matrix.is_halted is False
+
+class MockShadowLedger:
+    """Mock ledger to test the integration of localized freezes."""
+    def __init__(self):
+        self.locked_tenants = set()
+        
+    def lock_tenant_by_id(self, tenant_id: str) -> bool:
+        self.locked_tenants.add(tenant_id)
+        return True
+
+def test_localized_freeze_authorized(admin_creds):
+    token, master_hash, matrix = admin_creds
+    ledger = MockShadowLedger()
+    
+    severed_tenants = []
+    def mock_sever_sockets(tenant_id):
+        severed_tenants.append(tenant_id)
+        
+    matrix.register_freeze_callback(mock_sever_sockets)
+    
+    # Trigger the freeze
+    success = matrix.trigger_localized_freeze(token, master_hash, "Operative_Alpha", ledger)
+    
+    assert success is True
+    assert "Operative_Alpha" in ledger.locked_tenants
+    assert "Operative_Alpha" in severed_tenants
+
+def test_localized_freeze_unauthorized(admin_creds):
+    token, master_hash, matrix = admin_creds
+    ledger = MockShadowLedger()
+    sub_user_hash = secrets.token_hex(32) # Invalid master hash
+    
+    success = matrix.trigger_localized_freeze(token, sub_user_hash, "Operative_Alpha", ledger)
+    
+    assert success is False
+    assert "Operative_Alpha" not in ledger.locked_tenants

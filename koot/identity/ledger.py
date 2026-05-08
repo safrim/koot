@@ -82,3 +82,14 @@ class ShadowLedger:
                 self._save_db(db)
             else:
                 raise KeyError(f"Tenant with cert hash '{cert_hash}' not found in Ledger.")
+
+    def lock_tenant_by_id(self, tenant_id: str) -> bool:
+        """Finds a tenant by their ID and locks their partition."""
+        with self._lock:
+            db = self._load_db()
+            for cert_hash, data in db["tenants"].items():
+                if data.get("tenant_id") == tenant_id:
+                    data["locked"] = True
+                    self._save_db(db)
+                    return True
+            return False

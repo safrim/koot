@@ -21,6 +21,9 @@ class ZeroTrustGateway:
         self.server_key_path = server_key_path
         self.shadow_ledger = shadow_ledger
         self.server: Optional[asyncio.AbstractServer] = None
+        
+        # Overwatch Registry: Tracks live sockets grouped by tenant_id
+        self.active_sessions: dict[str, set[asyncio.StreamWriter]] = {}
 
     def _create_ssl_context(self) -> ssl.SSLContext:
         """Configures the SSL context to strictly require client certificates."""
@@ -33,6 +36,19 @@ class ZeroTrustGateway:
         context.minimum_version = ssl.TLSVersion.TLSv1_2
         
         return context
+
+    async def drop_tenant_sessions(self, tenant_id: str):
+        """Instantly severs all active mTLS sockets for a specific tenant."""
+        if tenant_id in self.active_sessions:
+            writers = list(self.active_sessions[tenant_id])
+            for writer in writers:
+                logger.warning(f"Severing active socket for locked tenant: {tenant_id}")
+                writer.close()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
+            self.active_sessions[tenant_id].clear()
 
     async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         """Handles incoming validated connections and enforces Ledger boundaries."""
@@ -61,7 +77,7 @@ class ZeroTrustGateway:
         subject = dict(x[0] for x in peer_cert.get('subject', ()))
         common_name = subject.get('commonName', 'Unknown')
         
-        # --- Session 2: Context Extraction & Enforcement ---
+        # --- Context Extraction & Enforcement ---
         tenant_context = None
         if self.shadow_ledger:
             tenant_context = self.shadow_ledger.get_tenant(cert_hash)
@@ -81,6 +97,13 @@ class ZeroTrustGateway:
                 return
                 
             logger.info(f"Accepted connection. Tenant: {tenant_context['tenant_id']} (Permissions: {tenant_context['permissions']})")
+            
+            # --- Overwatch: Register the active session ---
+            t_id = tenant_context['tenant_id']
+            if t_id not in self.active_sessions:
+                self.active_sessions[t_id] = set()
+            self.active_sessions[t_id].add(writer)
+            
         else:
             logger.info(f"Accepted authenticated mTLS connection from {addr} (NO LEDGER ATTACHED)")
         
@@ -103,6 +126,12 @@ class ZeroTrustGateway:
         except Exception as e:
             logger.error(f"Error handling connection from {addr}: {e}")
         finally:
+            # --- Overwatch: Unregister the active session upon disconnect ---
+            if tenant_context:
+                t_id = tenant_context['tenant_id']
+                if t_id in self.active_sessions and writer in self.active_sessions[t_id]:
+                    self.active_sessions[t_id].remove(writer)
+                    
             logger.info(f"Closing connection to {addr}")
             writer.close()
             await writer.wait_closed()
