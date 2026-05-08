@@ -47,7 +47,10 @@ This plan seamlessly attaches to the end of our previous roadmap, maintaining th
     * *Action:* Implement a secure export utility. It reads selected Envelopes, decrypts them in volatile memory, and packages them into a standardized, encrypted `koot-archive` format, or a plaintext CSV (with a giant warning prompt via the Override Matrix).
 
 #### Phase 7: The Command Line Interface (CLI Shell)
-* **Session 21: The Headless Shell (koot-cli).** * *Action:* Build a lightweight CLI application (using Python's `Click` or `Typer`, or Go/Rust). This application contains **zero cryptographic logic**. It strictly opens a connection to koot's local Unix Socket (IPC Gateway built in Session 11).
+* **Session 21: The Headless Shell (koot-cli).** 
+    
+    * *Action:* Build a lightweight CLI application (using Python's `Click` or `Typer`, or Go/Rust). This application contains **zero cryptographic logic**. It strictly opens a connection to koot's local Unix Socket (IPC Gateway built in Session 11).
+    
     * *Outcome:* You can type commands like `koot unlock`, `koot get [uuid]`, and `koot override --nuke`.
 
 #### Phase 8: Desktop & Web Interfaces (The Glass Layer)
