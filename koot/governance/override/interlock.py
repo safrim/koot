@@ -84,14 +84,14 @@ class OverrideMatrix:
                 
         return True
 
-    def provision_agent(self, token: str, client_cert_hash: str, tenant_id: str, new_client_cert_hash: str, permissions: list, shadow_ledger: Any, entropy_pipeline: Any, core_master_key: bytes) -> bool:
+    def provision_agent(self, token: str, client_cert_hash: str, tenant_id: str, permissions: list, shadow_ledger: Any, entropy_pipeline: Any, core_master_key: bytes, new_client_cert_hash: str = None, packager: Any = None) -> dict:
         """
         Autonomously generates an escrowed sub-key and injects the new user into the Shadow Ledger.
-        Requires Master Authority.
+        If a packager is provided, it handles cert generation and outputs an encrypted onboarding zip.
         """
         if not self.verify_master_authority(token, client_cert_hash):
             logger.warning(f"Unauthorized provisioning attempt for '{tenant_id}'. Silently dropping.")
-            return False
+            return {"success": False}
         
         logger.info(f"MANUAL OVERRIDE: Provisioning new agent '{tenant_id}'.")
         
@@ -102,6 +102,17 @@ class OverrideMatrix:
             # 2. Wrap it cryptographically with the core Master Key for escrow
             escrowed_key = entropy_pipeline.wrap_for_escrow(tenant_key, core_master_key)
             
+            otp = None
+            encrypted_package = None
+
+            # Generate onboarding package if packager is provided
+            if packager:
+                otp = packager.generate_otp()
+                encrypted_package, generated_cert_hash = packager.create_encrypted_package(tenant_id, otp)
+                new_client_cert_hash = generated_cert_hash
+            elif not new_client_cert_hash:
+                raise ValueError("Must provide either 'new_client_cert_hash' or a 'packager'.")
+
             # 3. Inject the new operative into the stealth ledger
             if shadow_ledger:
                 shadow_ledger.add_tenant(
@@ -110,10 +121,17 @@ class OverrideMatrix:
                     permissions=permissions,
                     escrowed_key=escrowed_key
                 )
-            return True
+                
+            return {
+                "success": True,
+                "tenant_id": tenant_id,
+                "cert_hash": new_client_cert_hash,
+                "otp": otp,
+                "encrypted_package": encrypted_package
+            }
         except Exception as e:
             logger.error(f"Failed to provision agent '{tenant_id}': {e}")
-            return False
+            return {"success": False}
 
     @property
     def is_halted(self) -> bool:

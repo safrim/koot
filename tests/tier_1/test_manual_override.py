@@ -8,6 +8,8 @@ def admin_creds():
     master_hash = secrets.token_hex(32)
     return token, master_hash, OverrideMatrix(token, master_hash)
 
+# --- Base Matrix Tests ---
+
 def test_unauthorized_halt_wrong_token(admin_creds):
     token, master_hash, matrix = admin_creds
     success = matrix.trigger_global_halt("wrong-token", master_hash)
@@ -63,14 +65,37 @@ def test_reset_functionality(admin_creds):
     matrix.reset_halt(token, master_hash)
     assert matrix.is_halted is False
 
+
+# --- Mock Classes for Advanced Protocol Tests ---
+
 class MockShadowLedger:
-    """Mock ledger to test the integration of localized freezes."""
+    """Mock ledger to test the integration of localized freezes and provisioning."""
     def __init__(self):
         self.locked_tenants = set()
+        self.tenants = {}
         
     def lock_tenant_by_id(self, tenant_id: str) -> bool:
         self.locked_tenants.add(tenant_id)
         return True
+
+    def add_tenant(self, cert_hash: str, tenant_id: str, permissions: list, escrowed_key: str):
+        self.tenants[cert_hash] = {
+            "tenant_id": tenant_id,
+            "permissions": permissions,
+            "escrowed_key": escrowed_key,
+            "locked": False
+        }
+
+class MockEntropyPipeline:
+    """Mock pipeline to bypass actual cryptographic key generation during fast tests."""
+    def generate_tenant_master_key(self) -> bytes:
+        return b"mock_32_byte_tenant_key_00000000"
+        
+    def wrap_for_escrow(self, tenant_key: bytes, core_master_key: bytes) -> str:
+        return "mock_escrowed_hex"
+
+
+# --- Localized Freeze Tests ---
 
 def test_localized_freeze_authorized(admin_creds):
     token, master_hash, matrix = admin_creds
@@ -99,37 +124,17 @@ def test_localized_freeze_unauthorized(admin_creds):
     assert success is False
     assert "Operative_Alpha" not in ledger.locked_tenants
 
-# --- Updates for Provisioning Tests ---
 
-# Update the MockShadowLedger to support the add_tenant method
-class ExtendedMockShadowLedger(MockShadowLedger):
-    def __init__(self):
-        super().__init__()
-        self.tenants = {}
-        
-    def add_tenant(self, cert_hash: str, tenant_id: str, permissions: list, escrowed_key: str):
-        self.tenants[cert_hash] = {
-            "tenant_id": tenant_id,
-            "permissions": permissions,
-            "escrowed_key": escrowed_key,
-            "locked": False
-        }
-
-class MockEntropyPipeline:
-    def generate_tenant_master_key(self) -> bytes:
-        return b"mock_32_byte_tenant_key_00000000"
-        
-    def wrap_for_escrow(self, tenant_key: bytes, core_master_key: bytes) -> str:
-        return "mock_escrowed_hex"
+# --- Automated Provisioning Tests ---
 
 def test_provision_agent_authorized(admin_creds):
     token, master_hash, matrix = admin_creds
-    ledger = ExtendedMockShadowLedger()
+    ledger = MockShadowLedger()
     pipeline = MockEntropyPipeline()
     core_master_key = b"mock_core_master_key_32_bytes_12"
     new_cert_hash = secrets.token_hex(32)
     
-    success = matrix.provision_agent(
+    result = matrix.provision_agent(
         token=token,
         client_cert_hash=master_hash,
         tenant_id="Operative_Delta",
@@ -140,20 +145,22 @@ def test_provision_agent_authorized(admin_creds):
         core_master_key=core_master_key
     )
     
-    assert success is True
+    # Result is now a dictionary
+    assert result["success"] is True
+    assert result["tenant_id"] == "Operative_Delta"
     assert new_cert_hash in ledger.tenants
     assert ledger.tenants[new_cert_hash]["tenant_id"] == "Operative_Delta"
     assert ledger.tenants[new_cert_hash]["escrowed_key"] == "mock_escrowed_hex"
 
 def test_provision_agent_unauthorized(admin_creds):
     token, master_hash, matrix = admin_creds
-    ledger = ExtendedMockShadowLedger()
+    ledger = MockShadowLedger()
     pipeline = MockEntropyPipeline()
     core_master_key = b"mock_core_master_key_32_bytes_12"
     new_cert_hash = secrets.token_hex(32)
     sub_user_hash = secrets.token_hex(32) # Invalid authority
     
-    success = matrix.provision_agent(
+    result = matrix.provision_agent(
         token=token,
         client_cert_hash=sub_user_hash, 
         tenant_id="Operative_Delta",
@@ -164,5 +171,5 @@ def test_provision_agent_unauthorized(admin_creds):
         core_master_key=core_master_key
     )
     
-    assert success is False
+    assert result["success"] is False
     assert new_cert_hash not in ledger.tenants
