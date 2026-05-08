@@ -67,8 +67,8 @@ Here is the finalized, secure implementation plan for the **Stealth Multi-Tenant
     * **Action:** Add a `trigger_localized_freeze(tenant_id)` method to `koot/governance/override/interlock.py`. This must instantly sever all active mTLS sockets for that specific `tenant_id` and toggle a `locked=True` flag in the Shadow Ledger.
 
 **Session 10: Autonomous Self-Defense (Anti-DoS Bridging)**
-* **Objective:** Let the system defend itself without allowing attackers to weaponize the defense.
-* **Action:** Connect Heuristic Triggers to the `OverrideMatrix`. **Crucially, implement a rate-limiter on authentication failures.** If an operative breaks a data-velocity rule, auto-freeze them. If there are repeated *failed* authentication attempts from an unknown source, do NOT freeze the operative (which allows DoS); instead, silently IP-ban the attacker at the network edge via a firewall rule script.
+    * **Objective:** Let the system defend itself without allowing attackers to weaponize the defense.
+    * **Action:** Connect Heuristic Triggers to the `OverrideMatrix`. **Crucially, implement a rate-limiter on authentication failures.** If an operative breaks a data-velocity rule, auto-freeze them. If there are repeated *failed* authentication attempts from an unknown source, do NOT freeze the operative (which allows DoS); instead, silently IP-ban the attacker at the network edge via a firewall rule script.
 
 ---
 
@@ -76,8 +76,8 @@ Here is the finalized, secure implementation plan for the **Stealth Multi-Tenant
 *Removing the hassle of manual administration.*
 
 **Session 11: The God-Mode Provisioning Pipeline**
-* **Objective:** Allow one-command user creation.
-* **Action:** Add `provision_agent(tenant_id, schemas, quota)` to the `OverrideMatrix`. Program this to autonomously generate the 256-bit `tenant_master_key`, wrap it for escrow, and inject the new user into the Shadow Ledger.
+    * **Objective:** Allow one-command user creation.
+    * **Action:** Add `provision_agent(tenant_id, schemas, quota)` to the `OverrideMatrix`. Program this to autonomously generate the 256-bit `tenant_master_key`, wrap it for escrow, and inject the new user into the Shadow Ledger.
 
 **Session 12: Certificate & Secure Onboarding Packaging**
 * **Objective:** Generate a secure, hand-off package that cannot be intercepted.
