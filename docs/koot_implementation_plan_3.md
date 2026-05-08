@@ -45,9 +45,9 @@ Here is the finalized, secure implementation plan for the **Stealth Multi-Tenant
     * **Action:** Modify `koot/governance/override/interlock.py`. Hardcode the validation to strictly check for *your* specific Master Certificate hash and Admin Token. Program the API router to silently ignore and drop any `trigger_global_halt` or `nuke` requests that originate from a sub-user session context.
 
 **Session 6: Escrowed Sub-Keys (The Backdoor)**
-* **Objective:** Ensure you can read, freeze, or wipe a sub-user's data at will.
-* **Action:** Create a sub-module in the `EntropyPipeline`. Take the newly generated 256-bit `tenant_master_key` (from Session 3) and encrypt it using your core Master Key. Store this wrapped key safely inside the Shadow Ledger alongside their permissions.
-* **Outcome:** You hold the cryptographic master key to every sub-vault on the server, safely wrapped in your own encryption.
+    * **Objective:** Ensure you can read, freeze, or wipe a sub-user's data at will.
+    * **Action:** Create a sub-module in the `EntropyPipeline`. Take the newly generated 256-bit `tenant_master_key` (from Session 3) and encrypt it using your core Master Key. Store this wrapped key safely inside the Shadow Ledger alongside their permissions.
+    * **Outcome:** You hold the cryptographic master key to every sub-vault on the server, safely wrapped in your own encryption.
 
 ---
 

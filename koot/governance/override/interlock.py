@@ -8,24 +8,31 @@ logger = logging.getLogger(__name__)
 class OverrideMatrix:
     """
     High-priority command interface for manual system overrides.
-    Requires an Admin Token to execute critical halts or aborts.
+    Requires both the Admin Token AND the Master Certificate Hash
+    to execute critical halts or aborts. Sub-user contexts are silently ignored.
     """
-    def __init__(self, admin_token: str):
+    def __init__(self, admin_token: str, master_cert_hash: str):
         self._admin_token = admin_token
+        self._master_cert_hash = master_cert_hash
         self._is_halted = False
-        self._lock = threading.Lock() # Defined here with underscore
+        self._lock = threading.Lock() 
         self._abort_callbacks: list[Callable] = []
 
-    def verify_token(self, token: str) -> bool:
-        return secrets.compare_digest(self._admin_token, token)
+    def verify_master_authority(self, token: str, client_cert_hash: str) -> bool:
+        """Strictly validates both the token and the certificate hash."""
+        # Use compare_digest for both to mitigate timing attacks
+        valid_token = secrets.compare_digest(self._admin_token, token)
+        valid_cert = secrets.compare_digest(self._master_cert_hash, client_cert_hash)
+        
+        return valid_token and valid_cert
 
-    def trigger_global_halt(self, token: str) -> bool:
+    def trigger_global_halt(self, token: str, client_cert_hash: str) -> bool:
         """Instantly sets the system to a halted state."""
-        if not self.verify_token(token):
-            logger.warning("Unauthorized attempt to trigger global halt!")
+        if not self.verify_master_authority(token, client_cert_hash):
+            # Silently drop unauthorized requests to mask defensive behavior
+            logger.warning("Unauthorized override attempt. Silently dropping.")
             return False
         
-        # FIX: Changed self.lock to self._lock to match __init__
         with self._lock:
             self._is_halted = True
             logger.critical("MANUAL OVERRIDE: Global system halt engaged.")
@@ -35,9 +42,9 @@ class OverrideMatrix:
         """Register functions to call when a manual abort is triggered."""
         self._abort_callbacks.append(callback)
 
-    def trigger_abort_all(self, token: str) -> bool:
+    def trigger_abort_all(self, token: str, client_cert_hash: str) -> bool:
         """Executes all registered abort sequences (e.g., stopping a Nuke)."""
-        if not self.verify_token(token):
+        if not self.verify_master_authority(token, client_cert_hash):
             return False
             
         logger.info("MANUAL OVERRIDE: Executing all registered abort sequences.")
@@ -50,13 +57,13 @@ class OverrideMatrix:
 
     @property
     def is_halted(self) -> bool:
-        with self._lock: # Ensure underscore is used here as well
+        with self._lock: 
             return self._is_halted
 
-    def reset_halt(self, token: str) -> bool:
+    def reset_halt(self, token: str, client_cert_hash: str) -> bool:
         """Resets the halt state."""
-        if self.verify_token(token):
-            with self._lock: # Added lock protection for the reset
+        if self.verify_master_authority(token, client_cert_hash):
+            with self._lock: 
                 self._is_halted = False
             return True
         return False

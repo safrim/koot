@@ -9,8 +9,7 @@ from koot.governance.override.interlock import OverrideMatrix
 class NukeProtocol:
     """
     Implementation of the 'Dead Man's Switch' and system-wide 'Nuke' protocol.
-    If the heartbeat is not received within the timeout period, the system 
-    executes the emergency response (wiping or locking).
+    Strictly enforces Master Authority for arming, disarming, and heartbeats.
     """
     def __init__(
         self, 
@@ -18,7 +17,6 @@ class NukeProtocol:
         target_path: Optional[str] = None, 
         emergency_callback: Optional[Callable] = None
     ):
-        # Integration: Inject the Override Matrix to allow manual halts
         self.matrix = override_matrix
         self.target_path = Path(target_path) if target_path else None
         self.emergency_callback = emergency_callback
@@ -31,8 +29,12 @@ class NukeProtocol:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger("NukeProtocol")
 
-    def arm(self, timeout_seconds: int):
+    def arm(self, timeout_seconds: int, token: str, client_cert_hash: str) -> bool:
         """Arms the Dead Man's Switch with a specific timeout."""
+        if not self.matrix.verify_master_authority(token, client_cert_hash):
+            self.logger.warning("Unauthorized attempt to ARM Nuke Protocol. Dropping.")
+            return False
+
         self.timeout = timeout_seconds
         self.last_heartbeat = time.time()
         self.is_armed = True
@@ -43,17 +45,29 @@ class NukeProtocol:
             self._monitor_thread.start()
         
         self.logger.info(f"Nuke Protocol ARMED. Timeout: {timeout_seconds}s")
+        return True
 
-    def heartbeat(self):
+    def heartbeat(self, token: str, client_cert_hash: str) -> bool:
         """Resets the timer, preventing the Nuke from triggering."""
+        if not self.matrix.verify_master_authority(token, client_cert_hash):
+            self.logger.warning("Unauthorized Nuke heartbeat attempt. Dropping.")
+            return False
+
         if self.is_armed:
             self.last_heartbeat = time.time()
+            return True
+        return False
 
-    def disarm(self):
+    def disarm(self, token: str, client_cert_hash: str) -> bool:
         """Safely deactivates the protocol."""
+        if not self.matrix.verify_master_authority(token, client_cert_hash):
+            self.logger.warning("Unauthorized attempt to DISARM Nuke Protocol. Dropping.")
+            return False
+
         self.is_armed = False
         self._stop_event.set()
         self.logger.info("Nuke Protocol DISARMED.")
+        return True
 
     def _monitor_loop(self):
         """Background loop to check if the timeout has expired."""
@@ -61,7 +75,6 @@ class NukeProtocol:
             if not self.is_armed:
                 break
             
-            # Step 2: The Halt Guard
             # If the manual override interlock is engaged, stop the monitor immediately
             if self.matrix.is_halted:
                 self.logger.info("Nuke Protocol HALTED by Manual Override Interlock.")
@@ -96,6 +109,11 @@ class NukeProtocol:
             except Exception as e:
                 self.logger.error(f"Failed to wipe target: {e}")
 
-    def trigger_now(self):
+    def trigger_now(self, token: str, client_cert_hash: str) -> bool:
         """Manual override to trigger the nuke immediately."""
+        if not self.matrix.verify_master_authority(token, client_cert_hash):
+            self.logger.warning("Unauthorized attempt to trigger Nuke. Silently dropping.")
+            return False
+            
         self._execute_nuke()
+        return True
