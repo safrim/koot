@@ -59,8 +59,8 @@ Here is the finalized, secure implementation plan for the **Stealth Multi-Tenant
     * **Action:** Refactor `koot/governance/analytics/observer.py`. Intercept the `tenant_id` from the Registry Bus. Tag data throughput metrics, encryption timing, and schema access requests with the specific user's ID.
 
 **Session 8: Heuristic Triggers & Baselines**
-* **Objective:** Teach the Analytics Engine what a "threat" looks like.
-* **Action:** Build a rule-evaluator in the Analytics engine with hard thresholds (e.g., `MAX_DOWNLOAD_VELOCITY = 500MB/hr`).
+    * **Objective:** Teach the Analytics Engine what a "threat" looks like.
+    * **Action:** Build a rule-evaluator in the Analytics engine with hard thresholds (e.g., `MAX_DOWNLOAD_VELOCITY = 500MB/hr`).
 
 **Session 9: The Localized Freeze Command**
 * **Objective:** Build the mechanism to silently neutralize a single user.

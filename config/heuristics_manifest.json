@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "baselines": {
+    "default_quota_mb": 500,
+    "max_download_velocity_mb_hr": 500,
+    "max_illegal_schema_attempts": 3,
+    "max_failed_auth_attempts": 5
+  },
+  "threats": {
+    "MASS_DOWNLOAD": {
+      "description": "Tenant is downloading data at a rate exceeding normal velocity.",
+      "action": "trigger_localized_freeze",
+      "severity": "CRITICAL"
+    },
+    "SCHEMA_VIOLATION": {
+      "description": "Tenant attempted to access a schema outside their provisioning.",
+      "action": "trigger_localized_freeze",
+      "severity": "CRITICAL"
+    },
+    "BRUTE_FORCE_OR_STOLEN_CERT": {
+      "description": "Repeated failed authentication attempts linked to a specific tenant ID.",
+      "action": "alert_admin_and_ip_ban",
+      "severity": "HIGH"
+    }
+  }
+}
