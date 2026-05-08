@@ -84,6 +84,37 @@ class OverrideMatrix:
                 
         return True
 
+    def provision_agent(self, token: str, client_cert_hash: str, tenant_id: str, new_client_cert_hash: str, permissions: list, shadow_ledger: Any, entropy_pipeline: Any, core_master_key: bytes) -> bool:
+        """
+        Autonomously generates an escrowed sub-key and injects the new user into the Shadow Ledger.
+        Requires Master Authority.
+        """
+        if not self.verify_master_authority(token, client_cert_hash):
+            logger.warning(f"Unauthorized provisioning attempt for '{tenant_id}'. Silently dropping.")
+            return False
+        
+        logger.info(f"MANUAL OVERRIDE: Provisioning new agent '{tenant_id}'.")
+        
+        try:
+            # 1. Generate the true mathematically random 256-bit tenant master key
+            tenant_key = entropy_pipeline.generate_tenant_master_key()
+            
+            # 2. Wrap it cryptographically with the core Master Key for escrow
+            escrowed_key = entropy_pipeline.wrap_for_escrow(tenant_key, core_master_key)
+            
+            # 3. Inject the new operative into the stealth ledger
+            if shadow_ledger:
+                shadow_ledger.add_tenant(
+                    cert_hash=new_client_cert_hash,
+                    tenant_id=tenant_id,
+                    permissions=permissions,
+                    escrowed_key=escrowed_key
+                )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to provision agent '{tenant_id}': {e}")
+            return False
+
     @property
     def is_halted(self) -> bool:
         with self._lock: 
