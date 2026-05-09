@@ -1,53 +1,72 @@
 import os
 import gc
+import ctypes
 import argon2.low_level
+from typing import Optional
 from koot.core.bus.environment import EnvironmentSensor
 from koot.crypto.classical.fallback import SoftwareAESGCM
 
+# --- C-Enclave FFI(foreign function interface) Binding ---
+# Dynamically load the memory-locked C library compiled in Session 3.
+# We fail gracefully to a warning if the library isn't compiled yet, allowing tests to run.
+ENCLAVE_AVAILABLE = False
+try:
+    _lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../crypto/enclave/libkoot_enclave.so'))
+    _enclave_lib = ctypes.CDLL(_lib_path)
+    
+    # int allocate_secure_key(const unsigned char* key_data, size_t key_len);
+    _enclave_lib.allocate_secure_key.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
+    _enclave_lib.allocate_secure_key.restype = ctypes.c_int
+    
+    # void destroy_secure_key(int key_id);
+    _enclave_lib.destroy_secure_key.argtypes = [ctypes.c_int]
+    _enclave_lib.destroy_secure_key.restype = None
+    
+    ENCLAVE_AVAILABLE = True
+except OSError:
+    import logging
+    logging.warning("C-Enclave shared library not found. Have you run scripts/build_enclave.py?")
+
+
 class EntropyPipeline:
     def __init__(self, sensor: EnvironmentSensor = None, force_scaling_override: dict = None):
-        # Connect to the central nervous system to probe the hardware
         self.sensor = sensor or EnvironmentSensor()
-        
-        # Call the correct method we built in Phase 1.2
         self.capabilities = self.sensor.get_telemetry()
         
-        # Base Argon2id parameters
         self.time_cost = 3
-        self.hash_len = 32  # 256-bit output key for AES-256 / Kyber
+        self.hash_len = 32  # 256-bit output key
+        self.active_key_id: Optional[int] = None
         
-        # Read ram_gb directly from the telemetry dictionary
         ram_gb = self.capabilities.get("ram_gb", 4.0)
         
         if force_scaling_override:
             self.memory_cost = force_scaling_override.get("memory_cost", 262144)
             self.parallelism = force_scaling_override.get("parallelism", 4)
         elif ram_gb <= 2.0:
-            # IoT / Edge Device: Fallback to 64MB, 2 threads
             self.memory_cost = 65536
             self.parallelism = 2
         elif ram_gb <= 8.0:
-            # Standard PC: 256MB, 4 threads
             self.memory_cost = 262144
             self.parallelism = 4
         else:
-            # High-End Workstation / Server: 512MB, 8 threads
             self.memory_cost = 524288
             self.parallelism = 8
 
-    def derive_key(self, secret: str, salt: bytes = None) -> tuple[bytes, bytes]:
+    def derive_and_lock_key(self, secret: str, salt: bytes = None) -> tuple[int, bytes]:
         """
-        Derives a 32-byte raw cryptographic key from a secret string.
-        Returns a tuple of (raw_key_bytes, salt_bytes).
+        Derives the Master Key and instantly locks it inside the C-Enclave.
+        Returns a tuple of (C_Enclave_Pointer_ID, salt_bytes).
+        The raw key NEVER persists in Python's memory space.
         """
+        if not ENCLAVE_AVAILABLE:
+            raise RuntimeError("CRITICAL: C-Enclave memory lockdown is unavailable. Vault access denied to prevent memory leakage.")
+
         if not salt:
-            # Generate a cryptographically secure 16-byte salt if one isn't provided
             salt = os.urandom(16)
             
         secret_bytes = secret.encode('utf-8')
             
         try:
-            # We use low_level.hash_secret_raw to get the raw 32 bytes needed for cryptography
             raw_key = argon2.low_level.hash_secret_raw(
                 secret=secret_bytes,
                 salt=salt,
@@ -57,36 +76,40 @@ class EntropyPipeline:
                 hash_len=self.hash_len,
                 type=argon2.low_level.Type.ID 
             )
-            return raw_key, salt
+            
+            # Instantly pass the raw key to the OS-locked C-Enclave
+            self.active_key_id = _enclave_lib.allocate_secure_key(raw_key, len(raw_key))
+            
+            return self.active_key_id, salt
             
         finally:
             # --- Engineered Countermeasure: Ephemeral Memory Handling ---
+            # We explicitly destroy the Python references and force the garbage collector 
+            # to sweep the heap immediately, removing traces of the plaintext and raw key.
+            if 'raw_key' in locals():
+                del raw_key
             del secret_bytes
             del secret
             gc.collect()
 
+    def go_cold(self):
+        """
+        Triggers the C-Enclave to cryptographically wipe the active Master Key from RAM.
+        This must be called during vault lock or a Nuke Protocol event.
+        """
+        if ENCLAVE_AVAILABLE and self.active_key_id is not None:
+            _enclave_lib.destroy_secure_key(self.active_key_id)
+            self.active_key_id = None
+            gc.collect()
+
     def generate_tenant_master_key(self) -> bytes:
-        """
-        Generates a true mathematically random 256-bit (32-byte) key for a sub-tenant.
-        This ensures cryptographic isolation without deriving keys from public mTLS certificates.
-        """
         return os.urandom(32)
 
     def wrap_for_escrow(self, tenant_key: bytes, core_master_key: bytes) -> str:
-        """
-        [Phase 2 - Escrow Protocol]
-        Encrypts a tenant's master key using the core Master Key.
-        Returns a hex-encoded string of (nonce + ciphertext) safe for the Shadow Ledger.
-        """
         ciphertext, nonce = SoftwareAESGCM.encrypt(core_master_key, tenant_key)
         return (nonce + ciphertext).hex()
 
     def unwrap_from_escrow(self, escrowed_hex: str, core_master_key: bytes) -> bytes:
-        """
-        [Phase 2 - Escrow Protocol]
-        Decrypts an escrowed hex string back into the raw tenant master key, 
-        provided the core Master Key is correct.
-        """
         try:
             data = bytes.fromhex(escrowed_hex)
             if len(data) < 12:

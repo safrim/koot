@@ -28,22 +28,19 @@ Because I am `koot`—a hyper-paranoid, headless Zero-Trust subsystem—this pla
     * **Outcome:** The operating system is mathematically forbidden from writing the key to the hard drive's swap file, and we guarantee immediate memory destruction.
 
 **Session 4: Python FFI Integration**
-
-* **Objective:** Connect the `koot` Python engine to the C-Enclave.
-* **Action:** Refactor `EntropyPipeline` in `koot/identity/derivation/pipeline.py`. Use Python's `ctypes` or `cffi` library to pass the derived Master Key directly to `allocate_secure_key()` in the C-Enclave. Ensure Python immediately calls `del` and `gc.collect()` on its own temporary variables. Update the "Go Cold" (lock) function to trigger `destroy_secure_key()`.
-* **Outcome:** Python no longer holds the actual Master Key during standard operations; it only references the secure C pointer.
+    * **Objective:** Connect the `koot` Python engine to the C-Enclave.
+    * **Action:** Refactor `EntropyPipeline` in `koot/identity/derivation/pipeline.py`. Use Python's `ctypes` or `cffi` library to pass the derived Master Key directly to `allocate_secure_key()` in the C-Enclave. Ensure Python immediately calls `del` and `gc.collect()` on its own temporary variables. Update the "Go Cold" (lock) function to trigger `destroy_secure_key()`.
+    * **Outcome:** Python no longer holds the actual Master Key during standard operations; it only references the secure C pointer.
 
 ---
 
 ### **Phase 3: Coercion Defense & Governance**
-
 *Addressing Countermeasure D: Rubber-Hose Cryptanalysis. Integrating physical threat defenses into the authentication layer.*
 
 **Session 5: The Duress Protocol (Fake Vault)**
-
-* **Objective:** Provide plausible deniability under threat of physical violence.
-* **Action:** Modify the boot sequence and `EntropyPipeline`. Hash a pre-determined "Duress Password." If entered, the engine suppresses all errors, sets an internal `is_duress_mode = True` flag, and points the `StorageDriver` and `ShadowLedger` to secondary, decoy file paths (`shadow_ledger_dummy.json`).
-* **Outcome:** You can safely comply with an attacker's demand for the password. They will unlock a fully functional, mathematically valid `koot` core filled entirely with fabricated data.
+    * **Objective:** Provide plausible deniability under threat of physical violence.
+    * **Action:** Modify the boot sequence and `EntropyPipeline`. Hash a pre-determined "Duress Password." If entered, the engine suppresses all errors, sets an internal `is_duress_mode = True` flag, and points the `StorageDriver` and `ShadowLedger` to secondary, decoy file paths (`shadow_ledger_dummy.json`).
+    * **Outcome:** You can safely comply with an attacker's demand for the password. They will unlock a fully functional, mathematically valid `koot` core filled entirely with fabricated data.
 
 **Session 6: The Terminal Nuke Key**
 
