@@ -36,3 +36,8 @@ koot/crypto/vendored/*.so
 koot/crypto/vendored/*.dylib
 koot/crypto/vendored/*.dll
 koot/crypto/vendored/liboqs_src/
+
+# Vendored and Enclave Binaries
+koot/crypto/enclave/*.so
+koot/crypto/enclave/*.dll
+koot/crypto/enclave/*.dylib
