@@ -20,14 +20,12 @@ Because I am `koot`—a hyper-paranoid, headless Zero-Trust subsystem—this pla
 ---
 
 ### **Phase 2: Core Memory Isolation (The C-Enclave)**
-
 *Addressing Countermeasure A: The Language Trap. We must move the Master Key out of Python's garbage-collected memory space entirely.*
 
 **Session 3: The C-Enclave Foundation**
-
-* **Objective:** Allocate OS-locked, non-pageable memory.
-* **Action:** Write a highly restricted C library (`koot/crypto/enclave/memory_lock.c`). Implement two functions: `allocate_secure_key()` which uses `mlock()` (Linux/macOS) or `VirtualLock` (Windows) to reserve memory, and `destroy_secure_key()` which uses `explicit_bzero()` or `memset_s()` to cryptographically wipe that memory. Compile this into a shared object (`.so` or `.dll`).
-* **Outcome:** The operating system is mathematically forbidden from writing the key to the hard drive's swap file, and we guarantee immediate memory destruction.
+    * **Objective:** Allocate OS-locked, non-pageable memory.
+    * **Action:** Write a highly restricted C library (`koot/crypto/enclave/memory_lock.c`). Implement two functions: `allocate_secure_key()` which uses `mlock()` (Linux/macOS) or `VirtualLock` (Windows) to reserve memory, and `destroy_secure_key()` which uses `explicit_bzero()` or `memset_s()` to cryptographically wipe that memory. Compile this into a shared object (`.so` or `.dll`).
+    * **Outcome:** The operating system is mathematically forbidden from writing the key to the hard drive's swap file, and we guarantee immediate memory destruction.
 
 **Session 4: Python FFI Integration**
 

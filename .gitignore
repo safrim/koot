@@ -30,3 +30,9 @@ env/
 *.vault
 /certs
 /data
+
+# Vendored Cryptographic Binaries
+koot/crypto/vendored/*.so
+koot/crypto/vendored/*.dylib
+koot/crypto/vendored/*.dll
+koot/crypto/vendored/liboqs_src/
