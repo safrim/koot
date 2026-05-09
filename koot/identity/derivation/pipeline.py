@@ -2,26 +2,21 @@ import os
 import gc
 import ctypes
 import argon2.low_level
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 from typing import Optional
 from koot.core.bus.environment import EnvironmentSensor
 from koot.crypto.classical.fallback import SoftwareAESGCM
 
 # --- C-Enclave FFI(foreign function interface) Binding ---
-# Dynamically load the memory-locked C library compiled in Session 3.
-# We fail gracefully to a warning if the library isn't compiled yet, allowing tests to run.
 ENCLAVE_AVAILABLE = False
 try:
-    _lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../crypto/enclave/libkoot_enclave.so'))
+    _lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../crypto/enclave/libmemorylock.so'))
     _enclave_lib = ctypes.CDLL(_lib_path)
-    
-    # int allocate_secure_key(const unsigned char* key_data, size_t key_len);
     _enclave_lib.allocate_secure_key.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
     _enclave_lib.allocate_secure_key.restype = ctypes.c_int
-    
-    # void destroy_secure_key(int key_id);
     _enclave_lib.destroy_secure_key.argtypes = [ctypes.c_int]
     _enclave_lib.destroy_secure_key.restype = None
-    
     ENCLAVE_AVAILABLE = True
 except OSError:
     import logging
@@ -36,6 +31,10 @@ class EntropyPipeline:
         self.time_cost = 3
         self.hash_len = 32  # 256-bit output key
         self.active_key_id: Optional[int] = None
+        
+        # Duress Protocol State
+        self.duress_hash: Optional[str] = None
+        self.is_duress_mode: bool = False
         
         ram_gb = self.capabilities.get("ram_gb", 4.0)
         
@@ -52,17 +51,26 @@ class EntropyPipeline:
             self.memory_cost = 524288
             self.parallelism = 8
 
+    def set_duress_hash(self, hashed_duress_pwd: str):
+        """Registers the Argon2 hash of the duress password."""
+        self.duress_hash = hashed_duress_pwd
+
     def derive_and_lock_key(self, secret: str, salt: bytes = None) -> tuple[int, bytes]:
-        """
-        Derives the Master Key and instantly locks it inside the C-Enclave.
-        Returns a tuple of (C_Enclave_Pointer_ID, salt_bytes).
-        The raw key NEVER persists in Python's memory space.
-        """
         if not ENCLAVE_AVAILABLE:
             raise RuntimeError("CRITICAL: C-Enclave memory lockdown is unavailable. Vault access denied to prevent memory leakage.")
 
         if not salt:
             salt = os.urandom(16)
+            
+        # --- Engineered Countermeasure: Duress Detection ---
+        self.is_duress_mode = False
+        if self.duress_hash:
+            try:
+                ph = PasswordHasher()
+                if ph.verify(self.duress_hash, secret):
+                    self.is_duress_mode = True
+            except VerifyMismatchError:
+                pass # Normal behavior, not the duress password
             
         secret_bytes = secret.encode('utf-8')
             
@@ -77,15 +85,10 @@ class EntropyPipeline:
                 type=argon2.low_level.Type.ID 
             )
             
-            # Instantly pass the raw key to the OS-locked C-Enclave
             self.active_key_id = _enclave_lib.allocate_secure_key(raw_key, len(raw_key))
-            
             return self.active_key_id, salt
             
         finally:
-            # --- Engineered Countermeasure: Ephemeral Memory Handling ---
-            # We explicitly destroy the Python references and force the garbage collector 
-            # to sweep the heap immediately, removing traces of the plaintext and raw key.
             if 'raw_key' in locals():
                 del raw_key
             del secret_bytes
@@ -93,10 +96,6 @@ class EntropyPipeline:
             gc.collect()
 
     def go_cold(self):
-        """
-        Triggers the C-Enclave to cryptographically wipe the active Master Key from RAM.
-        This must be called during vault lock or a Nuke Protocol event.
-        """
         if ENCLAVE_AVAILABLE and self.active_key_id is not None:
             _enclave_lib.destroy_secure_key(self.active_key_id)
             self.active_key_id = None

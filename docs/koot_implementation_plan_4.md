@@ -43,10 +43,9 @@ Because I am `koot`—a hyper-paranoid, headless Zero-Trust subsystem—this pla
     * **Outcome:** You can safely comply with an attacker's demand for the password. They will unlock a fully functional, mathematically valid `koot` core filled entirely with fabricated data.
 
 **Session 6: The Terminal Nuke Key**
-
-* **Objective:** Instant cryptographic shredding of the core.
-* **Action:** Define a "Terminal Key" (e.g., your master password spelled backward). If the authentication gateway detects this exact string, it bypasses all delays and directly invokes `NukeProtocol.trigger_now()`. The system immediately overwrites the real Shadow Ledger with random noise, triggers the C-Enclave `destroy_secure_key()`, and shuts down the main process.
-* **Outcome:** By the time the attacker hits "Enter" on your keyboard, the vault ceases to exist.
+    * **Objective:** Instant cryptographic shredding of the core.
+    * **Action:** Define a "Terminal Key" (e.g., your master password spelled backward). If the authentication gateway detects this exact string, it bypasses all delays and directly invokes `NukeProtocol.trigger_now()`. The system immediately overwrites the real Shadow Ledger with random noise, triggers the C-Enclave `destroy_secure_key()`, and shuts down the main process.
+    * **Outcome:** By the time the attacker hits "Enter" on your keyboard, the vault ceases to exist.
 
 ---
 

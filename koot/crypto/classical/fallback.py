@@ -32,7 +32,7 @@ class SoftwareAESGCM:
         
         # Hypothetical C-binding invocation
         res = _libaes.decrypt_aes_gcm(key, ciphertext, len(ciphertext), pt_buffer)
-        if res != 0:
-            raise ValueError("Invalid Tag: Data tampering detected.")
+        if res != 1:
+            raise ValueError("AES-GCM Decryption failed: Invalid MAC tag or corrupted data.")
             
         return bytes(pt_buffer)
