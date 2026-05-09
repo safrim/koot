@@ -92,3 +92,21 @@ class ShadowLedger:
                     self._save_db(db)
                     return True
             return False
+
+    def shred(self):
+        """
+        Countermeasure D (Terminal Nuke): Instantly overwrites the database and 
+        temporary files with random noise before deleting them to prevent 
+        forensic recovery from the hard drive.
+        """
+        with self._lock:
+            for target in [self.db_path, self.db_path + '.tmp']:
+                if os.path.exists(target):
+                    try:
+                        size = os.path.getsize(target)
+                        # Overwrite with cryptographically secure random bytes
+                        with open(target, 'r+b') as f:
+                            f.write(os.urandom(size))
+                        os.remove(target)
+                    except Exception:
+                        pass # Best effort destruction during a nuke scenario

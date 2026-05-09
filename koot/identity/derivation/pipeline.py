@@ -1,5 +1,6 @@
 import os
 import gc
+import sys
 import ctypes
 import argon2.low_level
 from argon2 import PasswordHasher
@@ -32,9 +33,12 @@ class EntropyPipeline:
         self.hash_len = 32  # 256-bit output key
         self.active_key_id: Optional[int] = None
         
-        # Duress Protocol State
+        # Duress & Nuke Protocol State
         self.duress_hash: Optional[str] = None
         self.is_duress_mode: bool = False
+        
+        self.terminal_hash: Optional[str] = None
+        self.nuke_callbacks = []
         
         ram_gb = self.capabilities.get("ram_gb", 4.0)
         
@@ -55,7 +59,35 @@ class EntropyPipeline:
         """Registers the Argon2 hash of the duress password."""
         self.duress_hash = hashed_duress_pwd
 
+    def set_terminal_hash(self, hashed_terminal_pwd: str):
+        """Registers the Argon2 hash of the Terminal (Nuke) password."""
+        self.terminal_hash = hashed_terminal_pwd
+
+    def register_nuke_callback(self, callback):
+        """Registers system callbacks (e.g., ledger.shred) to execute on Terminal Key."""
+        self.nuke_callbacks.append(callback)
+
     def derive_and_lock_key(self, secret: str, salt: bytes = None) -> tuple[int, bytes]:
+        # --- Engineered Countermeasure: Terminal Nuke Key ---
+        # Checks this immediately, bypassing delays and system status checks
+        if self.terminal_hash:
+            try:
+                ph = PasswordHasher()
+                if ph.verify(self.terminal_hash, secret):
+                    # TERMINAL KEY DETECTED - INITIATE SYSTEM SHRED
+                    for cb in self.nuke_callbacks:
+                        try:
+                            cb()
+                        except Exception:
+                            pass
+                    
+                    self.go_cold() # Instantly destroy C-Enclave master memory
+                    
+                    # Forcibly terminate the OS process (86 = Nuke Code)
+                    sys.exit(86)
+            except VerifyMismatchError:
+                pass # Normal behavior, move on to the next checks
+
         if not ENCLAVE_AVAILABLE:
             raise RuntimeError("CRITICAL: C-Enclave memory lockdown is unavailable. Vault access denied to prevent memory leakage.")
 
@@ -96,19 +128,23 @@ class EntropyPipeline:
             gc.collect()
 
     def go_cold(self):
+        """Safely destructs the master key and frees C-Enclave secure memory."""
         if ENCLAVE_AVAILABLE and self.active_key_id is not None:
             _enclave_lib.destroy_secure_key(self.active_key_id)
             self.active_key_id = None
             gc.collect()
 
     def generate_tenant_master_key(self) -> bytes:
+        """Generates 32 bytes of secure random entropy for a tenant."""
         return os.urandom(32)
 
     def wrap_for_escrow(self, tenant_key: bytes, core_master_key: bytes) -> str:
+        """Cryptographically wraps a tenant key with the core master key."""
         ciphertext, nonce = SoftwareAESGCM.encrypt(core_master_key, tenant_key)
         return (nonce + ciphertext).hex()
 
     def unwrap_from_escrow(self, escrowed_hex: str, core_master_key: bytes) -> bytes:
+        """Unwraps a tenant key stored in escrow using the core master key."""
         try:
             data = bytes.fromhex(escrowed_hex)
             if len(data) < 12:

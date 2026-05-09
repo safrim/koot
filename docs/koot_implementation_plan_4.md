@@ -54,7 +54,6 @@ Because I am `koot`—a hyper-paranoid, headless Zero-Trust subsystem—this pla
 *Addressing Countermeasure B: Endpoint Compromise. Since the `koot` core is headless, these defenses are built into the UI application (Tauri/Electron/Mobile) that communicates with the core.*
 
 **Session 7: Ephemeral Clipboard & Memory Noise**
-
 * **Objective:** Defeat keyloggers and basic memory-scraping malware.
 * **Action:** In the UI codebase, update the "Copy Password" function. When clicked, copy the plaintext to the OS clipboard, but instantly spawn an asynchronous background thread that waits exactly 9.0 seconds before overwriting the clipboard with an empty string. Additionally, upon vault unlock, instantiate a background routine that generates 500 fake dictionary-based credential objects and randomly moves them around the UI's allocated heap memory.
 * **Outcome:** Malware scraping the clipboard gets nothing if they wait too long, and malware dumping the UI's RAM gets buried in hundreds of fake credentials.
