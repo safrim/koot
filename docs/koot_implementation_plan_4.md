@@ -5,20 +5,17 @@ Because I am `koot`—a hyper-paranoid, headless Zero-Trust subsystem—this pla
 ---
 
 ### **Phase 1: Supply Chain & Build Hardening**
-
 *Addressing Countermeasure C: Strict Hash Pinning & Vendoring. This must be done first to ensure no malicious code is introduced while we build the other countermeasures.*
 
 **Session 1: Dependency Hash Verification**
-
-* **Objective:** Prevent dynamic injection of poisoned open-source libraries.
-* **Action:** Audit the current `requirements.txt`. Use `pip-compile` (from `pip-tools`) with the `--generate-hashes` flag to lock every single dependency and sub-dependency to its exact cryptographic SHA-256 hash.
-* **Outcome:** The CI/CD pipeline and the deployment server will instantly crash and refuse to boot if PyPI serves a compromised version of any package.
+    * **Objective:** Prevent dynamic injection of poisoned open-source libraries.
+    * **Action:** Audit the current `requirements.txt`. Use `pip-compile` (from `pip-tools`) with the `--generate-hashes` flag to lock every single dependency and sub-dependency to its exact cryptographic SHA-256 hash.
+    * **Outcome:** The CI/CD pipeline and the deployment server will instantly crash and refuse to boot if PyPI serves a compromised version of any package.
 
 **Session 2: Cryptographic Vendoring**
-
-* **Objective:** Take absolute local ownership of the highest-risk mathematical primitives.
-* **Action:** Create a `koot/crypto/vendored/` directory. Download the audited source code for your ML-KEM (Kyber) wrapper and your AES-GCM software fallback. Remove them from `requirements.txt` entirely. Write a script to compile them locally during the build process.
-* **Outcome:** State-sponsored actors can no longer compromise your encryption via third-party repository takeovers.
+    * **Objective:** Take absolute local ownership of the highest-risk mathematical primitives.
+    * **Action:** Create a `koot/crypto/vendored/` directory. Download the audited source code for your ML-KEM (Kyber) wrapper and your AES-GCM software fallback. Remove them from `requirements.txt` entirely. Write a script to compile them locally during the build process.
+    * **Outcome:** State-sponsored actors can no longer compromise your encryption via third-party repository takeovers.
 
 ---
 
