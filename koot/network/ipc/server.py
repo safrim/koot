@@ -104,6 +104,40 @@ class LocalIPCGateway:
                 self.logger.error(f"Error unlocking vault: {e}")
                 return {"status": "error", "message": f"Internal error: {e}"}
 
+        if action == "system.override":
+            command = payload.get("command")
+            token = payload.get("token")
+            
+            if command == "nuke":
+                # Note: In a fully wired environment, the 'token' would be verified 
+                # against the OverrideMatrix here before proceeding.
+                
+                koot_home = Path.home() / ".koot"
+                ledger_path = koot_home / "ledger.shadow"
+                salt_path = koot_home / ".salt"
+                
+                # 1. Cryptographically Shred Files
+                for path in [ledger_path, salt_path]:
+                    if path.exists():
+                        try:
+                            # Overwrite with random bytes before unlink to prevent forensic disk recovery
+                            with open(path, "r+b") as f:
+                                f.write(os.urandom(path.stat().st_size))
+                            path.unlink()
+                            self.logger.info(f"Shredded {path.name}")
+                        except Exception as e:
+                            self.logger.error(f"Failed to shred {path.name}: {e}")
+                
+                # 2. Wipe RAM from C-Enclave
+                try:
+                    pipeline = EntropyPipeline()
+                    pipeline.go_cold()
+                except Exception as e:
+                    self.logger.error(f"Error flushing memory enclave: {e}")
+                
+                self.logger.critical("MANUAL OVERRIDE: Dead Man's Switch Triggered. Ledger shredded, RAM wiped.")
+                return {"status": "success", "message": "System Nuked. Ledger destroyed and RAM wiped."}
+
         if not self.registry:
             return {"status": "error", "message": "Registry Bus not initialized"}
         

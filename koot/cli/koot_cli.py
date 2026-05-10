@@ -62,20 +62,32 @@ def main():
 
     # Route the commands
     if args.command == "unlock":
-        # Securely prompt the user for their Master Password
         password = getpass.getpass("Enter Master Password: ")
         response = asyncio.run(cli.send_command("vault.unlock", {"password": password}))
+        print(json.dumps(response, indent=2))
+        
     elif args.command == "get":
         response = asyncio.run(cli.send_command("vault.get", {"uuid": args.uuid}))
+        print(json.dumps(response, indent=2))
+        
     elif args.command == "override":
         if args.nuke:
-            response = asyncio.run(cli.send_command("system.override", {"command": "nuke"}))
+            token = getpass.getpass("Enter Admin Token for NUKE: ")
+            print("WARNING: This will instantly shred the vault and wipe memory.")
+            confirm = input("Type 'NUKE' to confirm: ")
+            
+            if confirm == "NUKE":
+                response = asyncio.run(cli.send_command("system.override", {
+                    "command": "nuke", 
+                    "token": token
+                }))
+                print(json.dumps(response, indent=2))
+            else:
+                print("Nuke aborted.")
+                sys.exit(0)
         else:
             print("Error: Missing override flag (e.g., --nuke)")
             sys.exit(1)
-    
-    # Output the JSON response from the Koot Core
-    print(json.dumps(response, indent=2))
 
 if __name__ == "__main__":
     main()

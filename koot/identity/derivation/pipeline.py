@@ -90,7 +90,7 @@ class EntropyPipeline:
             del secret_bytes
             gc.collect()
 
-    bdef derive_and_lock_key(self, secret: str, salt: bytes = None, hardware_factor: bytes = None) -> tuple[int, bytes]:
+    def derive_and_lock_key(self, secret: str, salt: bytes = None, hardware_factor: bytes = None) -> tuple[int, bytes]:
         """
         Derives the Master Key using Argon2id and locks it in the C-Enclave.
         Now supports an optional hardware_factor (TPM signature) for AppRole security.
