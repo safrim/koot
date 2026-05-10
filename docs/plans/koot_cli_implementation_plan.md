@@ -13,8 +13,8 @@ Here is your **Hardened Phased Implementation Plan** for the **Koot Zero-Trust S
 
 
 * **Session 2: The Hardened CLI Terminal (`koot/cli/koot_cli.py`)**
-* **Action:** Update the CLI to use `getpass` for secure password entry and include the "Shebang" so the OS recognizes it as a program.
-* **Outcome:** Typing `koot unlock` prompts for a hidden password.
+    * **Action:** Update the CLI to use `getpass` for secure password entry and include the "Shebang" so the OS recognizes it as a program.
+    * **Outcome:** Typing `koot unlock` prompts for a hidden password.
 
 
 * **Session 3: The IPC Validation Handler (`koot/network/ipc/server.py`)**

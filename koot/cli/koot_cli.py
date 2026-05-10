@@ -5,6 +5,7 @@ import json
 import argparse
 import sys
 import os
+import getpass
 
 class KootCLI:
     """
@@ -61,7 +62,9 @@ def main():
 
     # Route the commands
     if args.command == "unlock":
-        response = asyncio.run(cli.send_command("vault.unlock", {}))
+        # Securely prompt the user for their Master Password
+        password = getpass.getpass("Enter Master Password: ")
+        response = asyncio.run(cli.send_command("vault.unlock", {"password": password}))
     elif args.command == "get":
         response = asyncio.run(cli.send_command("vault.get", {"uuid": args.uuid}))
     elif args.command == "override":

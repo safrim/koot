@@ -2,9 +2,10 @@ import asyncio
 import json
 import os
 import pytest
+from unittest.mock import patch
 from koot.network.ipc.server import LocalIPCGateway
 from koot.core.bus.registry import AdaptiveRegistry
-from koot.cli.koot_cli import KootCLI
+from koot.cli.koot_cli import KootCLI, main
 
 @pytest.mark.asyncio
 async def test_cli_get_command():
@@ -60,3 +61,28 @@ async def test_cli_nuke_command():
         server_task.cancel()
         if os.path.exists(socket_path):
             os.remove(socket_path)
+
+@patch("getpass.getpass", return_value="super_secret_master_password")
+@patch("sys.argv", ["koot_cli.py", "unlock"])
+@patch("koot.cli.koot_cli.KootCLI.send_command")
+def test_cli_unlock_command_with_getpass(mock_send_command, mock_getpass):
+    """
+    Verifies that 'koot unlock' correctly prompts for a hidden password
+    using getpass and passes it into the JSON payload.
+    """
+    # Mock the send_command to simulate a successful async response without booting the socket
+    async def mock_response(*args, **kwargs):
+        return {"status": "success", "received": "vault.unlock"}
+    mock_send_command.side_effect = mock_response
+
+    # Run the CLI main method
+    main()
+
+    # Verify getpass was called to hide the prompt
+    mock_getpass.assert_called_once_with("Enter Master Password: ")
+    
+    # Verify the payload strictly contains the captured password
+    mock_send_command.assert_called_once_with(
+        "vault.unlock", 
+        {"password": "super_secret_master_password"}
+    )
