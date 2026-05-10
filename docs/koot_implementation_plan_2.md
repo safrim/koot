@@ -55,7 +55,8 @@ This plan seamlessly attaches to the end of our previous roadmap, maintaining th
 * **Session 22: The Local API Bridge (Sidecar).** 
     * *Action:* Because browsers and web apps cannot easily read Unix Sockets, build a local REST API bridge (e.g., using FastAPI). This bridge binds only to `localhost`, authenticates via the IPC, and serves JSON to local frontend applications.
 
-* **Session 23: The Desktop / Web Application.** * *Action:* Initialize a **Tauri** or **Electron** project. Build the graphical user interface. The UI will request the "Capability Manifest" from koot to dynamically render forms based on your active schemas (Credentials, Notes, Media). 
+* **Session 23: The Desktop / Web Application.** 
+* *Action:* Initialize a   **Tauri** or **Electron** project. Build the graphical user interface. The UI will request the "Capability Manifest" from koot to dynamically render forms based on your active schemas (Credentials, Notes, Media). 
     * *Outcome:* A sleek, native desktop application that visually represents the headless core.
 
 #### Phase 9: Mobile App & Cross-Device Syncing
