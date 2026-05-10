@@ -1,75 +1,74 @@
 #!/usr/bin/env python3
-
 import os
 import logging
+import getpass
 from pathlib import Path
+from koot.identity.derivation.pipeline import EntropyPipeline
+from koot.identity.ledger import ShadowLedger
 
-# Configure basic logging
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-def create_koot_structure(base_path: str = "."):
+def initialize_cryptographic_core():
     """
-    Automates the creation of the koot Domain-Driven file structure.
+    Phase 1, Session 1: The Birth Script.
+    Focuses on Master Key derivation and Shadow Ledger initialization[cite: 5, 6, 21].
     """
-    root_dir = Path(base_path)
+    koot_home = Path.home() / ".koot"
+    ledger_path = koot_home / "ledger.shadow"
+    salt_path = koot_home / ".salt"
+
+    # Ensure the configuration directory exists (security baseline) [cite: 6]
+    koot_home.mkdir(mode=0o700, parents=True, exist_ok=True)
     
-    # Define the directory tree
-    directories = [
-        "koot/core/bus",
-        "koot/core/envelope",
-        "koot/core/schema",
-        "koot/crypto/classical",
-        "koot/crypto/post_quantum",
-        "koot/crypto/combiner",
-        "koot/identity/derivation",
-        "koot/identity/machine",
-        "koot/storage/chunking",
-        "koot/storage/integrity",
-        "koot/storage/adapters",
-        "koot/storage/migration",
-        "koot/network/ipc",
-        "koot/network/gateway",
-        "koot/governance/analytics",
-        "koot/governance/audit",
-        "koot/governance/override",
-        "tests/tier_1",
-        "tests/integration",
-        "scripts",
-        "docs"
-    ]
+    if ledger_path.exists():
+        logging.warning(f"A Koot Ledger already exists at {ledger_path}.")
+        confirm = input("Overwrite it? THIS WILL DESTROY ALL DATA! (y/N): ")
+        if confirm.lower() != 'y':
+            logging.info("Initialization aborted.")
+            return
 
-    logging.info(f"Initializing koot architecture at: {root_dir.absolute()}")
+    # Securely collect the Master Password [cite: 5, 8]
+    print("\n--- Koot: Cryptographic Birth (Secret Zero) ---")
+    password = getpass.getpass("Set your Master Password: ")
+    confirm_pwd = getpass.getpass("Confirm Master Password: ")
 
-    # Create directories and __init__.py files
-    for dir_path in directories:
-        full_path = root_dir / dir_path
+    if password != confirm_pwd:
+        logging.error("Passwords do not match. Initialization failed.")
+        return
+
+    try:
+        # Derive the Master Key using Argon2id via the Entropy Pipeline [cite: 5, 21, 33]
+        pipeline = EntropyPipeline()
+        salt = os.urandom(16)
         
-        # Create the directory, including parents
-        full_path.mkdir(parents=True, exist_ok=True)
-        logging.info(f"Created directory: {dir_path}")
+        # We manually perform the initial derivation to get the raw key bytes 
+        # specifically for sealing the ledger for the first time[cite: 21, 33].
+        import argon2.low_level
+        raw_master_key = argon2.low_level.hash_secret_raw(
+            secret=password.encode('utf-8'),
+            salt=salt,
+            time_cost=pipeline.time_cost,
+            memory_cost=pipeline.memory_cost,
+            parallelism=pipeline.parallelism,
+            hash_len=pipeline.hash_len,
+            type=argon2.low_level.Type.ID
+        )
+
+        # Initialize and save the Shadow Ledger [cite: 21, 33]
+        # The ledger is protected by AES-GCM authenticated encryption[cite: 33].
+        ledger = ShadowLedger(str(ledger_path), raw_master_key)
         
-        # If it's part of the python source code (koot or tests), make it a package
-        if dir_path.startswith("koot") or dir_path.startswith("tests"):
-            init_file = full_path / "__init__.py"
-            if not init_file.exists():
-                init_file.touch()
-                
-    # Create top-level project files
-    top_level_files = {
-        "README.md": "# koot: Adaptive Security Organism\n\nModular, Information-Agnostic Secret Subsystem.",
-        "requirements.txt": "# Core Dependencies\n# e.g., cryptography, liboqs-python",
-        ".gitignore": "__pycache__/\n*.pyc\n.env\n*.vault",
-        "koot/__init__.py": "__version__ = '0.1.0'\n"
-    }
+        # Store the salt needed for future derivation attempts [cite: 21]
+        with open(salt_path, "wb") as f:
+            f.write(salt)
+        os.chmod(salt_path, 0o600)
 
-    for file_name, content in top_level_files.items():
-        file_path = root_dir / file_name
-        if not file_path.exists():
-            with open(file_path, "w") as f:
-                f.write(content)
-            logging.info(f"Created file: {file_name}")
+        logging.info(f"Secret Zero born. Shadow Ledger sealed at {ledger_path}")
+        logging.info("System is now ready for the Hardened CLI and IPC Handlers.")
 
-    logging.info("koot architectural skeleton successfully generated! Ready for Phase 1.1.")
+    except Exception as e:
+        logging.error(f"Failed to initialize Koot core: {e}")
 
 if __name__ == "__main__":
-    create_koot_structure()
+    initialize_cryptographic_core()

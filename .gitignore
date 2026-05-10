@@ -35,6 +35,9 @@ env/
 koot/crypto/vendored/*.so
 koot/crypto/vendored/*.dylib
 koot/crypto/vendored/*.dll
+
+# Liboqs source and install directories
+koot/crypto/vendored/liboqs/
 koot/crypto/vendored/liboqs_src/
 
 # Vendored and Enclave Binaries

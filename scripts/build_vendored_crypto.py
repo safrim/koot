@@ -1,74 +1,139 @@
+#!/usr/bin/env python3
 import os
 import subprocess
 import sys
 import shutil
+import platform
 
+# Identify paths based on the Domain-Driven structure
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 VENDORED_DIR = os.path.join(PROJECT_ROOT, "koot", "crypto", "vendored")
 LIBOQS_REPO = "https://github.com/open-quantum-safe/liboqs.git"
-LIBOQS_TAG = "0.9.0"  # Pinned to a specific, audited release
-
-def run_cmd(cmd, cwd=None):
-    print(f"[*] Executing: {' '.join(cmd)}")
-    subprocess.run(cmd, cwd=cwd, check=True)
+LIBOQS_BUILD_DIR = os.path.join(VENDORED_DIR, "liboqs_build")
+LIBOQS_INSTALL_DIR = os.path.join(VENDORED_DIR, "liboqs")
 
 def build_liboqs():
-    print("\n[--- Building Vendored liboqs (Kyber) ---]")
-    build_dir = os.path.join(VENDORED_DIR, "liboqs_src")
-    if os.path.exists(build_dir):
-        shutil.rmtree(build_dir)
+    """
+    Clones and compiles the liboqs repository for Post-Quantum Cryptography (ML-KEM/Kyber).
+    This satisfies the 'Cryptographic Vendoring' requirement.
+    """
+    print(f"[*] Starting liboqs build pipeline...")
     
-    run_cmd(["git", "clone", "--branch", LIBOQS_TAG, "--depth", "1", LIBOQS_REPO, build_dir])
-    
-    # Configure and build liboqs
-    cmake_build_dir = os.path.join(build_dir, "build")
-    os.makedirs(cmake_build_dir, exist_ok=True)
-    
-    # We strictly only enable Kyber768 to reduce attack surface
-    run_cmd([
-        "cmake", "-GNinja", "-DBUILD_SHARED_LIBS=ON", 
-        "-DOQS_ENABLE_KEM_KYBER_768=ON", 
-        "-DOQS_ENABLE_SIG_ALL=OFF", 
+    # Ensure cmake and git are available
+    if not shutil.which("git") or not shutil.which("cmake"):
+        print("[!] Error: 'git' and 'cmake' are required to build liboqs.")
+        sys.exit(1)
+
+    # Step 1: Clone the repository if it doesn't exist
+    if not os.path.exists(LIBOQS_BUILD_DIR):
+        print(f"[*] Cloning liboqs from {LIBOQS_REPO}...")
+        try:
+            subprocess.run(["git", "clone", "--depth", "1", LIBOQS_REPO, LIBOQS_BUILD_DIR], check=True)
+        except subprocess.CalledProcessError:
+            print("[!] Failed to clone liboqs.")
+            sys.exit(1)
+    else:
+        print("[*] liboqs source already exists. Skipping clone.")
+
+    # Step 2: Configure and build using CMake
+    build_path = os.path.join(LIBOQS_BUILD_DIR, "build")
+    os.makedirs(build_path, exist_ok=True)
+
+    print("[*] Configuring liboqs with CMake...")
+    cmake_cmd = [
+        "cmake",
+        "-GNinja", # Try Ninja first for speed
+        "-DCMAKE_INSTALL_PREFIX=" + LIBOQS_INSTALL_DIR,
+        "-DBUILD_SHARED_LIBS=ON",
+        "-DOQS_USE_OPENSSL=ON", # Integrate with OpenSSL for hybrid modes
         ".."
-    ], cwd=cmake_build_dir)
-    run_cmd(["ninja"], cwd=cmake_build_dir)
+    ]
     
-    # Move the compiled library out
-    lib_ext = ".dylib" if sys.platform == "darwin" else ".so"
-    compiled_lib = os.path.join(cmake_build_dir, "lib", f"liboqs{lib_ext}")
-    dest_lib = os.path.join(VENDORED_DIR, f"liboqs{lib_ext}")
-    
-    shutil.copy2(compiled_lib, dest_lib)
-    print(f"[+] Vendored liboqs secured at: {dest_lib}")
+    try:
+        # Fallback to Makefiles if Ninja isn't installed
+        if not shutil.which("ninja"):
+            cmake_cmd.remove("-GNinja")
+            
+        subprocess.run(cmake_cmd, cwd=build_path, check=True)
+        
+        print("[*] Compiling liboqs...")
+        subprocess.run(["cmake", "--build", "."], cwd=build_path, check=True)
+        
+        print("[*] Installing liboqs to vendored directory...")
+        subprocess.run(["cmake", "--install", "."], cwd=build_path, check=True)
+        
+        print("[+] liboqs Build successful.")
+    except subprocess.CalledProcessError as e:
+        print("[!] liboqs Compilation failed!")
+        sys.exit(1)
 
 def build_aes_gcm():
-    print("\n[--- Building Vendored AES-GCM Fallback ---]")
-    # In a real air-gapped scenario, you would pull from a trusted local C file.
-    # For this implementation, we simulate compiling an audited C standalone AES-GCM.
-    dummy_c = os.path.join(VENDORED_DIR, "aes_gcm_vendored.c")
-    with open(dummy_c, "w") as f:
-        f.write("""
-        // Minimal Audited AES-GCM C implementation
-        #include <stdint.h>
-        int encrypt_aes_gcm(const uint8_t *key, const uint8_t *pt, int pt_len, uint8_t *ct) { return 0; }
-        int decrypt_aes_gcm(const uint8_t *key, const uint8_t *ct, int ct_len, uint8_t *pt) { return 0; }
-        """)
+    """
+    Compiles the vendored C layer for AES-GCM.
+    Links against OpenSSL (libcrypto) to enable hardware acceleration (AES-NI).
+    """
+    source_file = os.path.join(VENDORED_DIR, "aes_gcm_vendored.c")
     
-    lib_ext = ".dylib" if sys.platform == "darwin" else ".so"
-    dest_lib = os.path.join(VENDORED_DIR, f"libaesgcm{lib_ext}")
-    run_cmd(["gcc", "-shared", "-O3", "-fPIC", "-o", dest_lib, dummy_c])
-    print(f"[+] Vendored AES-GCM secured at: {dest_lib}")
+    # Set the output filename based on the OS to maintain the Adaptive requirement
+    if platform.system() == "Windows":
+        output_file = os.path.join(VENDORED_DIR, "aes_gcm.dll")
+    else:
+        output_file = os.path.join(VENDORED_DIR, "aes_gcm.so")
+    
+    print(f"[*] Starting AES-GCM build: {source_file}")
+    
+    if not os.path.exists(source_file):
+        print(f"[!] Error: Source file not found at {source_file}")
+        sys.exit(1)
+
+    # The compilation command explicitly includes -lcrypto
+    # -shared: Create a shared library
+    # -fPIC: Position Independent Code (required for shared libraries)
+    # -O3: Aggressive optimization for cryptographic operations
+    # -lcrypto: Link against OpenSSL's libcrypto for EVP API
+    compile_cmd = [
+        "gcc", 
+        "-O3",
+        "-shared", 
+        "-o", output_file, 
+        "-fPIC", 
+        source_file, 
+        "-lcrypto"
+    ]
+
+    try:
+        print(f"[*] Running: {' '.join(compile_cmd)}")
+        result = subprocess.run(compile_cmd, check=True, capture_output=True, text=True)
+        print("[+] AES-GCM Build successful.")
+        print(f"[+] Binary located at: {output_file}")
+    except subprocess.CalledProcessError as e:
+        print("[!] AES-GCM Compilation failed!")
+        print(e.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print("[!] Error: 'gcc' compiler not found. Please install build-essential or equivalent.")
+        sys.exit(1)
+
+def cleanup():
+    """
+    Removes temporary build directories to keep the vendored folder clean.
+    """
+    if os.path.exists(LIBOQS_BUILD_DIR):
+        print("\n[*] Cleaning up temporary liboqs build files...")
+        shutil.rmtree(LIBOQS_BUILD_DIR)
+        print("[+] Cleanup complete.")
 
 if __name__ == "__main__":
+    # Ensure the vendored directory exists before starting
     os.makedirs(VENDORED_DIR, exist_ok=True)
-    # create __init__.py so it's a module
-    with open(os.path.join(VENDORED_DIR, "__init__.py"), "w") as f:
-        f.write("# Vendored cryptographic primitives.\n")
-        
-    try:
-        build_liboqs()
-        build_aes_gcm()
-        print("\n[SUCCESS] Phase 1, Session 2 (Cryptographic Vendoring) complete. Dependencies isolated.")
-    except subprocess.CalledProcessError as e:
-        print(f"\n[FATAL] Build failed: {e}")
-        sys.exit(1)
+    
+    # 1. Build the Classical layer (AES-GCM)
+    build_aes_gcm()
+    
+    # 2. Build the Post-Quantum layer (Kyber/liboqs)
+    build_liboqs()
+    
+    # 3. Securely clean up build artifacts
+    cleanup()
+    
+    print("\n[SUCCESS] Cryptographic vendoring complete. The Koot core is ready.")
