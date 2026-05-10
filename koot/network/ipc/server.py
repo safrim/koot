@@ -2,8 +2,13 @@ import asyncio
 import os
 import json
 import logging
+from pathlib import Path
 from typing import Dict, Any
+import argon2.low_level
+
 from koot.core.bus.registry import AdaptiveRegistry
+from koot.identity.ledger import ShadowLedger
+from koot.identity.derivation.pipeline import EntropyPipeline
 
 class LocalIPCGateway:
     """
@@ -26,8 +31,7 @@ class LocalIPCGateway:
             action = request.get("action")
             payload = request.get("payload", {})
 
-            # Integration with the Registry Bus
-            # Example: dispatching to a crypto or storage plugin
+            # Dispatching to bus / internal handlers
             response = await self._dispatch_to_bus(action, payload)
 
             writer.write(json.dumps(response).encode())
@@ -40,10 +44,57 @@ class LocalIPCGateway:
 
     async def _dispatch_to_bus(self, action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Routes the IPC request to the internal Registry Bus."""
+        
+        if action == "vault.unlock":
+            password = payload.get("password")
+            if not password:
+                return {"status": "error", "message": "Password is required"}
+            
+            try:
+                koot_home = Path.home() / ".koot"
+                ledger_path = koot_home / "ledger.shadow"
+                salt_path = koot_home / ".salt"
+
+                if not salt_path.exists() or not ledger_path.exists():
+                    return {"status": "error", "message": "Vault not initialized. Run init_koot.py first."}
+
+                with open(salt_path, "rb") as f:
+                    salt = f.read()
+
+                pipeline = EntropyPipeline()
+                raw_master_key = argon2.low_level.hash_secret_raw(
+                    secret=password.encode('utf-8'),
+                    salt=salt,
+                    time_cost=pipeline.time_cost,
+                    memory_cost=pipeline.memory_cost,
+                    parallelism=pipeline.parallelism,
+                    hash_len=pipeline.hash_len,
+                    type=argon2.low_level.Type.ID
+                )
+
+                # Validate the key against the Ledger
+                ledger = ShadowLedger(str(ledger_path), raw_master_key)
+                
+                # _load_db raises ValueError if decryption fails due to invalid key
+                ledger._load_db()
+
+                # Trigger C-Enclave memory lock in the pipeline
+                pipeline.derive_and_lock_key(password, salt=salt)
+                
+                self.logger.info("Vault unlocked successfully.")
+                return {"status": "success", "message": "Vault unlocked successfully"}
+                
+            except ValueError:
+                self.logger.warning("Failed unlock attempt: Invalid Master Password.")
+                return {"status": "error", "message": "Invalid Master Password"}
+            except Exception as e:
+                self.logger.error(f"Error unlocking vault: {e}")
+                return {"status": "error", "message": f"Internal error: {e}"}
+
         if not self.registry:
             return {"status": "error", "message": "Registry Bus not initialized"}
         
-        # Placeholder for registry dispatch logic
+        # Fallback for other registry dispatch logic
         return {"status": "success", "received": action}
 
     async def start(self):

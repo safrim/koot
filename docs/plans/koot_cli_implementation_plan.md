@@ -18,21 +18,17 @@ Here is your **Hardened Phased Implementation Plan** for the **Koot Zero-Trust S
 
 
 * **Session 3: The IPC Validation Handler (`koot/network/ipc/server.py`)**
-* **Action:** Rewrite the `vault.unlock` handler in the server. It must now load the Ledger, run the derivation, and check if the key matches.
-* **Outcome:** The server rejects empty or wrong passwords, and only says "Success" when the Master Key is actually in memory.
-
-
+    * **Action:** Rewrite the `vault.unlock` handler in the server. It must now load the Ledger, run the derivation, and check if the key matches.
+    * **Outcome:** The server rejects empty or wrong passwords, and only says "Success" when the Master Key is actually in memory.
 
 ---
 
 ## **Phase 2: Agnostic Data Wrapping**
-
 **Objective:** Move from "dummy data" to the real **Agnostic Envelope** system. This allows Koot to store anything from strings to large binaries.
 
 * **Session 4: The Envelope Specification**
-* **Action:** Implement `koot/core/envelope/envelope.py`. Define the JSON/Binary structure (Header + Crypto-ID + Salt + Ciphertext).
-* **Outcome:** You can programmatically "wrap" a piece of text into a secure blob.
-
+    * **Action:** Implement `koot/core/envelope/envelope.py`. Define the JSON/Binary structure (Header + Crypto-ID + Salt + Ciphertext).
+    * **Outcome:** You can programmatically "wrap" a piece of text into a secure blob.
 
 * **Session 5: Storage Driver Orchestration**
 * **Action:** Connect your `LocalFileSystemAdapter` and `SQLiteAdapter`. Ensure that when a secret is saved, it is automatically chunked into 64KB pieces and indexed in the Shadow Ledger.
@@ -90,9 +86,3 @@ Here is your **Hardened Phased Implementation Plan** for the **Koot Zero-Trust S
 
 
 ---
-
-### **How we proceed:**
-
-I will hold this plan in my memory. When you are ready, simply say: **"Let's start Phase 1, Session 1"** and I will provide the full code and instructions for that specific unit.
-
-Shall we begin with the **Birth Script**?
