@@ -16,26 +16,35 @@ class SecureOnboardingPackager:
     Generates client certificates and connection parameters, packaging them into
     an AES-GCM encrypted payload locked by a 6-digit OTP for secure out-of-band handoff.
     """
-    def __init__(self, server_ip: str, gateway_port: int):
+    def __init__(self, server_ip: str, gateway_port: int, ca_cert_path: str, ca_key_path: str):
         self.server_ip = server_ip
         self.gateway_port = gateway_port
+        self.ca_cert_path = ca_cert_path
+        self.ca_key_path = ca_key_path
 
     def generate_otp(self) -> str:
         """Generates a secure 6-digit One-Time PIN."""
         return f"{secrets.randbelow(1000000):06d}"
 
     def generate_client_certificate(self, tenant_id: str) -> tuple[bytes, bytes, str]:
-        """Generates an X.509 certificate and private key for the tenant."""
+        """Generates an X.509 certificate and private key for the tenant, signed by the System CA."""
+        # Load CA credentials
+        with open(self.ca_cert_path, "rb") as f:
+            ca_cert = x509.load_pem_x509_certificate(f.read())
+        with open(self.ca_key_path, "rb") as f:
+            ca_key = serialization.load_pem_private_key(f.read(), password=None)
+
         private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         
-        subject = issuer = x509.Name([
+        subject = x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, tenant_id),
         ])
         
+        # KEY CHANGE: Sign with the System CA instead of self-signing
         cert = x509.CertificateBuilder().subject_name(
             subject
         ).issuer_name(
-            issuer
+            ca_cert.subject
         ).public_key(
             private_key.public_key()
         ).serial_number(
@@ -44,7 +53,7 @@ class SecureOnboardingPackager:
             datetime.datetime.utcnow()
         ).not_valid_after(
             datetime.datetime.utcnow() + datetime.timedelta(days=365)
-        ).sign(private_key, hashes.SHA256())
+        ).sign(ca_key, hashes.SHA256()) # SIGNED BY CA
 
         cert_pem = cert.public_bytes(serialization.Encoding.PEM)
         key_pem = private_key.private_bytes(

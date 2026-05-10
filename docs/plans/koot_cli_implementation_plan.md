@@ -53,8 +53,8 @@ Here is your **Hardened Phased Implementation Plan** for the **Koot Zero-Trust S
 **Objective:** Allow your CLI to talk to a Koot Core running on a different machine (e.g., a home server) securely.
 
 * **Session 8: mTLS Certificate Provisioning**
-* **Action:** Create a script to generate X.509 certificates. You need one for the Server and one for your specific Client (laptop/phone).
-* **Outcome:** A `certs/` folder with unique identity keys.
+    * **Action:** Create a script to generate X.509 certificates. You need one for the Server and one for your specific Client (laptop/phone).
+    * **Outcome:** A `certs/` folder with unique identity keys.
 
 * **Session 9: The Zero-Trust Gateway**
 * **Action:** Implement the mTLS listener. This is a separate "Gate" that sits in front of the core and drops any connection that doesn't provide a valid certificate.
