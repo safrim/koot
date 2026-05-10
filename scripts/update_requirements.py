@@ -5,8 +5,17 @@ import subprocess
 from importlib.metadata import version, PackageNotFoundError
 
 # Define project directories to scan and local modules to ignore
+def discover_local_modules(root_path):
+    local_mods = set()
+    for root, dirs, files in os.walk(root_path):
+        if any(ignore in root for ignore in ["venv", ".git", "__pycache__"]):
+            continue
+        local_mods.update(dirs)
+        local_mods.update(f[:-3] for f in files if f.endswith(".py"))
+    return local_mods
+
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-LOCAL_MODULES = {"koot", "tests", "scripts"}
+LOCAL_MODULES = discover_local_modules(PROJECT_ROOT)
 
 # Get the list of Python Standard Library modules
 if sys.version_info >= (3, 10):
@@ -23,7 +32,8 @@ IMPORT_TO_PYPI_MAP = {
     "cv2": "opencv-python",
     "argon2": "argon2-cffi",
     "oqs": "liboqs-python",
-    "tpm2_pytss": "tpm2-pytss"
+    "tpm2_pytss": "tpm2-pytss",
+    "git": "GitPython"
 }
 
 def extract_imports_from_file(filepath):
