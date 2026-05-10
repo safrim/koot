@@ -44,13 +44,12 @@ Here is your **Hardened Phased Implementation Plan** for the **Koot Zero-Trust S
     * **Outcome:** Koot can uniquely identify your computer's motherboard/TPM chip.
 
 * **Session 7: The "AppRole" Unlock Flow**
-* **Action:** Update the derivation pipeline to combine **(Master Password + TPM Signature)** to create the final operational key.
-* **Outcome:** If you copy your encrypted files to another computer, your password will fail to unlock them because the hardware signature doesn't match.
+    * **Action:** Update the derivation pipeline to combine **(Master Password + TPM Signature)** to create the final operational key.
+    * **Outcome:** If you copy your encrypted files to another computer, your password will fail to unlock them because the hardware signature doesn't match.
 
 ---
 
 ## **Phase 4: Remote Access & Zero-Trust Networking**
-
 **Objective:** Allow your CLI to talk to a Koot Core running on a different machine (e.g., a home server) securely.
 
 * **Session 8: mTLS Certificate Provisioning**

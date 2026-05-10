@@ -90,7 +90,11 @@ class EntropyPipeline:
             del secret_bytes
             gc.collect()
 
-    def derive_and_lock_key(self, secret: str, salt: bytes = None) -> tuple[int, bytes]:
+    def derive_and_lock_key(self, secret: str, salt: bytes = None, hardware_factor: bytes = None) -> tuple[int, bytes]:
+        """
+        Derives the Master Key using Argon2id and locks it in the C-Enclave.
+        Now supports an optional hardware_factor (TPM signature) for AppRole security.
+        """
         # --- Engineered Countermeasure: Terminal Nuke Key ---
         if self.terminal_hash:
             try:
@@ -120,12 +124,14 @@ class EntropyPipeline:
                     self.is_duress_mode = True
             except VerifyMismatchError:
                 pass 
-            
-        secret_bytes = secret.encode('utf-8')
+        
+        # --- AppRole: Combine Password + Hardware Factor ---
+        # We append the hardware factor bytes to the secret bytes for a unified salt-resistant secret
+        composite_secret = secret.encode('utf-8') + (hardware_factor or b"")
             
         try:
             raw_key = argon2.low_level.hash_secret_raw(
-                secret=secret_bytes,
+                secret=composite_secret,
                 salt=salt,
                 time_cost=self.time_cost,
                 memory_cost=self.memory_cost,
@@ -140,9 +146,9 @@ class EntropyPipeline:
         finally:
             if 'raw_key' in locals():
                 del raw_key
-            del secret_bytes
-            del secret
-            gc.collect()
+            del composite_secret
+            # Manual cleanup of strings/bytes to minimize RAM traces
+            gc.collect() 
 
     def go_cold(self):
         """Safely destructs the master key and frees C-Enclave secure memory."""

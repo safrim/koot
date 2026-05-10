@@ -9,6 +9,8 @@ import argon2.low_level
 from koot.core.bus.registry import AdaptiveRegistry
 from koot.identity.ledger import ShadowLedger
 from koot.identity.derivation.pipeline import EntropyPipeline
+from koot.identity.machine.tpm_provider import TPMIdentityProvider
+from koot.identity.machine.unlock import MachineUnlockManager
 
 class LocalIPCGateway:
     """
@@ -56,14 +58,27 @@ class LocalIPCGateway:
                 salt_path = koot_home / ".salt"
 
                 if not salt_path.exists() or not ledger_path.exists():
-                    return {"status": "error", "message": "Vault not initialized. Run init_koot.py first."}
+                    return {"status": "error", "message": "Vault not initialized."}
 
                 with open(salt_path, "rb") as f:
                     salt = f.read()
 
+                # --- AppRole: Fetch Hardware Fingerprint ---
+                tpm = TPMIdentityProvider()
+                unlock_manager = MachineUnlockManager(tpm)
+                # We use the machine's hostname as the machine_id for the challenge
+                import socket
+                machine_id = socket.gethostname()
+                
+                # We derive a machine signature factor
+                hardware_factor = unlock_manager.generate_vault_key(machine_id, salt)
+
                 pipeline = EntropyPipeline()
+                
+                # derive composite raw_master_key to validate the Ledger
+                composite_secret = password.encode('utf-8') + hardware_factor
                 raw_master_key = argon2.low_level.hash_secret_raw(
-                    secret=password.encode('utf-8'),
+                    secret=composite_secret,
                     salt=salt,
                     time_cost=pipeline.time_cost,
                     memory_cost=pipeline.memory_cost,
@@ -74,19 +89,17 @@ class LocalIPCGateway:
 
                 # Validate the key against the Ledger
                 ledger = ShadowLedger(str(ledger_path), raw_master_key)
-                
-                # _load_db raises ValueError if decryption fails due to invalid key
                 ledger._load_db()
 
-                # Trigger C-Enclave memory lock in the pipeline
-                pipeline.derive_and_lock_key(password, salt=salt)
+                # Securely lock the composite key in the C-Enclave
+                pipeline.derive_and_lock_key(password, salt=salt, hardware_factor=hardware_factor)
                 
-                self.logger.info("Vault unlocked successfully.")
+                self.logger.info("Vault unlocked via AppRole (Machine + Password).")
                 return {"status": "success", "message": "Vault unlocked successfully"}
                 
             except ValueError:
-                self.logger.warning("Failed unlock attempt: Invalid Master Password.")
-                return {"status": "error", "message": "Invalid Master Password"}
+                self.logger.warning("Failed unlock attempt: Invalid credentials or wrong machine.")
+                return {"status": "error", "message": "Invalid Master Password or Hardware Signature"}
             except Exception as e:
                 self.logger.error(f"Error unlocking vault: {e}")
                 return {"status": "error", "message": f"Internal error: {e}"}
