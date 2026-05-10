@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "koot"
+version = "0.1.0"
+# These are the absolute bare essentials for me to exist
+dependencies = [
+    "cryptography",
+    "argon2-cffi",
+    "tpm2-pytss"
+]
+
+[tool.setuptools.packages.find]
+# This tells the installer to IGNORE 'certs', 'data', and 'config'
+# and ONLY treat the 'koot' folder as the codebase.
+include = ["koot*"]

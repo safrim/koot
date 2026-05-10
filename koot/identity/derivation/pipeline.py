@@ -91,6 +91,13 @@ class EntropyPipeline:
             gc.collect()
 
     def derive_and_lock_key(self, secret: str, salt: bytes = None, hardware_factor: bytes = None) -> tuple[int, bytes]:
+        # --- PASTE THIS DEBUG BLOCK ---
+        print("\n====== [CRYPTOGRAPHY DEBUG] ======")
+        print(f"Password Length : {len(secret) if secret else 0}")
+        print(f"Salt            : {salt.hex() if salt else 'CRITICAL WARNING: NO SALT PROVIDED'}")
+        print(f"Hardware Factor : {hardware_factor.hex() if hardware_factor else 'NONE'}")
+        print("==================================\n")
+        # ------------------------------
         """
         Derives the Master Key using Argon2id and locks it in the C-Enclave.
         Now supports an optional hardware_factor (TPM signature) for AppRole security.

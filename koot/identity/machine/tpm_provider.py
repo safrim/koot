@@ -1,4 +1,5 @@
 import logging
+import hashlib
 from typing import Optional
 
 try:
@@ -32,8 +33,18 @@ class TPMIdentityProvider:
         This proves the machine's identity without exposing the private key.
         """
         if not self.is_hardware_present():
-            self.logger.warning("TPM hardware not found. Falling back to software mock.")
-            return b"MOCK_TPM_SIG_" + challenge
+            self.logger.warning("TPM hardware not found. Utilizing stable WSL/Linux OS anchor.")
+            try:
+                with open("/etc/machine-id", "r") as f:
+                    machine_id = f.read().strip()
+                
+                # CRITICAL FIX: Ignore the ephemeral challenge in WSL mock.
+                # We return a purely deterministic hash based ONLY on the machine's true identity.
+                return hashlib.sha256(b"WSL_STABLE_MOCK_" + machine_id.encode('utf-8')).digest()
+            
+            except FileNotFoundError:
+                self.logger.error("CRITICAL: /etc/machine-id not found. Cannot anchor identity.")
+                raise RuntimeError("Vault cannot be securely locked to this machine.")
 
         # In a production environment, this would perform a TPM2_Quote or TPM2_Sign operation
-        return b"HARDWARE_SIGNED_DATA_" + challenge
+        return b"HARDWARE_SIGNED_DATA_" + challenge 
