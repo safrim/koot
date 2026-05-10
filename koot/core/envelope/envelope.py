@@ -100,9 +100,13 @@ class SecretEnvelope:
                 expires_at=header_data.get("expires_at"),
                 tags=header_data.get("blind_tags") # temporarily load hashes into RAM
             )
-            payload = base64.b64decode(parsed["payload"])
+            
+            # validate=True ensures it strictly fails on invalid base64 strings
+            payload = base64.b64decode(parsed["payload"], validate=True)
             return cls(header=header, payload=payload)
-        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            
+        # ADDED ValueError HERE to catch base64/binascii decoding errors
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
             raise ValueError(f"Failed to deserialize Secret Envelope: {e}")
 
     def __repr__(self):
