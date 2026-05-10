@@ -1,4 +1,5 @@
 import os
+import io
 
 class AdaptiveChunker:
     def __init__(self, environment_sensor, telemetry_engine=None, override_matrix=None):
@@ -29,14 +30,24 @@ class AdaptiveChunker:
             self.current_chunk = min(self.current_chunk * 2, dynamic_max)
             self.stable_reads = 0
 
-    def process_stream(self, file_path):
-        with open(file_path, 'rb') as f:
-            while True:
-                self._evaluate_hardware()
-                chunk = f.read(self.current_chunk)
+    def _stream_generator(self, stream):
+        """Internal generator that dynamically chunks any open stream."""
+        while True:
+            self._evaluate_hardware()
+            chunk = stream.read(self.current_chunk)
+            
+            if not chunk:
+                break
                 
-                if not chunk:
-                    break
-                    
-                self.stable_reads += 1
-                yield chunk
+            self.stable_reads += 1
+            yield chunk
+
+    def process_file(self, file_path):
+        """For large physical media on disk."""
+        with open(file_path, 'rb') as f:
+            yield from self._stream_generator(f)
+
+    def process_bytes(self, payload: bytes):
+        """For in-memory secrets, without writing plaintext to disk."""
+        stream = io.BytesIO(payload)
+        yield from self._stream_generator(stream)

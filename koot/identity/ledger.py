@@ -110,3 +110,39 @@ class ShadowLedger:
                         os.remove(target)
                     except Exception:
                         pass # Best effort destruction during a nuke scenario
+
+    def update_index(self, tenant_id: str, secret_key: str, manifest: list):
+        """
+        Records the ordered list of chunks (manifest) for a given secret.
+        """
+        with self._lock: # Fix: Use self._lock with underscore
+            db = self._load_db()
+            
+            # Find the tenant entry (keyed by cert_hash but containing tenant_id)
+            target_key = None
+            for key, data in db["tenants"].items():
+                if data.get("tenant_id") == tenant_id:
+                    target_key = key
+                    break
+            
+            # If not found (e.g., during testing), initialize entry
+            if target_key is None:
+                target_key = tenant_id
+                db["tenants"][target_key] = {"tenant_id": tenant_id, "secrets": {}}
+
+            if "secrets" not in db["tenants"][target_key]:
+                db["tenants"][target_key]["secrets"] = {}
+                
+            db["tenants"][target_key]["secrets"][secret_key] = manifest
+            self._save_db(db)
+
+    def get_index(self, tenant_id: str, secret_key: str) -> list:
+        """
+        Retrieves the chunk manifest for a given secret.
+        """
+        with self._lock: # Fix: Use self._lock with underscore
+            db = self._load_db()
+            for data in db["tenants"].values():
+                if data.get("tenant_id") == tenant_id:
+                    return data.get("secrets", {}).get(secret_key)
+            return None
