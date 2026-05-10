@@ -31,10 +31,8 @@ Here is your **Hardened Phased Implementation Plan** for the **Koot Zero-Trust S
     * **Outcome:** You can programmatically "wrap" a piece of text into a secure blob.
 
 * **Session 5: Storage Driver Orchestration**
-* **Action:** Connect your `LocalFileSystemAdapter` and `SQLiteAdapter`. Ensure that when a secret is saved, it is automatically chunked into 64KB pieces and indexed in the Shadow Ledger.
-* **Outcome:** You can run `koot set my_secret` and see an obfuscated file appear on your disk.
-
-
+    * **Action:** Connect your `LocalFileSystemAdapter` and `SQLiteAdapter`. Ensure that when a secret is saved, it is automatically chunked into 64KB pieces and indexed in the Shadow Ledger.
+    * **Outcome:** You can run `koot set my_secret` and see an obfuscated file appear on your disk.
 
 ---
 
