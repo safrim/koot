@@ -37,19 +37,15 @@ Here is your **Hardened Phased Implementation Plan** for the **Koot Zero-Trust S
 ---
 
 ## **Phase 3: Hardware Root of Trust (TPM)**
-
 **Objective:** Implement the "Machine Identity" feature so that your Master Password only works on **your** specific physical machine.
 
 * **Session 6: The Machine Identity Module**
-* **Action:** Implement the `TPMProvider` in `koot/identity/machine/`. Logic to read the unique hardware signature of your laptop.
-* **Outcome:** Koot can uniquely identify your computer's motherboard/TPM chip.
-
+    * **Action:** Implement the `TPMProvider` in `koot/identity/machine/`. Logic to read the unique hardware signature of your laptop.
+    * **Outcome:** Koot can uniquely identify your computer's motherboard/TPM chip.
 
 * **Session 7: The "AppRole" Unlock Flow**
 * **Action:** Update the derivation pipeline to combine **(Master Password + TPM Signature)** to create the final operational key.
 * **Outcome:** If you copy your encrypted files to another computer, your password will fail to unlock them because the hardware signature doesn't match.
-
-
 
 ---
 
@@ -61,26 +57,19 @@ Here is your **Hardened Phased Implementation Plan** for the **Koot Zero-Trust S
 * **Action:** Create a script to generate X.509 certificates. You need one for the Server and one for your specific Client (laptop/phone).
 * **Outcome:** A `certs/` folder with unique identity keys.
 
-
 * **Session 9: The Zero-Trust Gateway**
 * **Action:** Implement the mTLS listener. This is a separate "Gate" that sits in front of the core and drops any connection that doesn't provide a valid certificate.
 * **Outcome:** You can communicate with Koot over the internet as securely as if you were plugged in via USB.
 
-
-
 ---
 
 ## **Phase 5: The Overwatch Protocol**
-
 **Objective:** Implementation of self-defense mechanisms.
 
 * **Session 10: The Immutable Audit Log**
 * **Action:** Implement the append-only logger that cryptographically "seals" logs every 50MB.
 
-
 * **Session 11: The Manual Override & Nuke Matrix**
 * **Action:** Implement the `koot override --nuke` command to instantly shred the Shadow Ledger and wipe RAM.
-
-
 
 ---

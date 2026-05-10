@@ -3,16 +3,14 @@ from koot.identity.machine.tpm_provider import TPMIdentityProvider
 from koot.identity.machine.unlock import MachineUnlockManager
 
 def test_tpm_mock_fallback():
+    """Verify that the system gracefully falls back to a mock if hardware is missing."""
     provider = TPMIdentityProvider(tcti="mock")
     challenge = b"verify_me"
     sig = provider.create_identity_signature(challenge)
     assert sig.startswith(b"MOCK_TPM_SIG_")
 
 def test_machine_unlock_consistency():
-    """
-    Ensure the same Machine ID and Nonce produce the same key,
-    proving the pipeline is deterministic for the same hardware.
-    """
+    """Ensure the pipeline is deterministic for the same hardware fingerprint."""
     provider = TPMIdentityProvider()
     manager = MachineUnlockManager(provider)
     
@@ -26,7 +24,7 @@ def test_machine_unlock_consistency():
     assert len(key1) == 32  # Standard AES-256 key length
 
 def test_machine_unlock_uniqueness():
-    """Different nonces must produce different keys."""
+    """Verify that different nonces produce distinct keys."""
     manager = MachineUnlockManager(TPMIdentityProvider())
     
     key1 = manager.generate_vault_key("machine", b"nonce_a_123456789")

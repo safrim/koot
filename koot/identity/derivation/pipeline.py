@@ -9,7 +9,7 @@ from typing import Optional
 from koot.core.bus.environment import EnvironmentSensor
 from koot.crypto.classical.fallback import SoftwareAESGCM
 
-# --- C-Enclave FFI(foreign function interface) Binding ---
+# --- C-Enclave FFI Binding ---
 ENCLAVE_AVAILABLE = False
 try:
     _lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../crypto/enclave/libmemorylock.so'))
@@ -67,34 +67,51 @@ class EntropyPipeline:
         """Registers system callbacks (e.g., ledger.shred) to execute on Terminal Key."""
         self.nuke_callbacks.append(callback)
 
+    def derive_key(self, secret: str, salt: bytes) -> tuple[bytes, bytes]:
+        """
+        Standard Argon2id derivation that returns raw bytes.
+        Used for intermediate keys or internal factors that don't need C-Enclave locking.
+        """
+        secret_bytes = secret.encode('utf-8')
+        try:
+            raw_key = argon2.low_level.hash_secret_raw(
+                secret=secret_bytes,
+                salt=salt,
+                time_cost=self.time_cost,
+                memory_cost=self.memory_cost,
+                parallelism=self.parallelism,
+                hash_len=self.hash_len,
+                type=argon2.low_level.Type.ID 
+            )
+            return raw_key, salt
+        finally:
+            if 'raw_key' in locals():
+                del raw_key
+            del secret_bytes
+            gc.collect()
+
     def derive_and_lock_key(self, secret: str, salt: bytes = None) -> tuple[int, bytes]:
         # --- Engineered Countermeasure: Terminal Nuke Key ---
-        # Checks this immediately, bypassing delays and system status checks
         if self.terminal_hash:
             try:
                 ph = PasswordHasher()
                 if ph.verify(self.terminal_hash, secret):
-                    # TERMINAL KEY DETECTED - INITIATE SYSTEM SHRED
                     for cb in self.nuke_callbacks:
                         try:
                             cb()
                         except Exception:
                             pass
-                    
-                    self.go_cold() # Instantly destroy C-Enclave master memory
-                    
-                    # Forcibly terminate the OS process (86 = Nuke Code)
+                    self.go_cold() 
                     sys.exit(86)
             except VerifyMismatchError:
-                pass # Normal behavior, move on to the next checks
+                pass 
 
         if not ENCLAVE_AVAILABLE:
-            raise RuntimeError("CRITICAL: C-Enclave memory lockdown is unavailable. Vault access denied to prevent memory leakage.")
+            raise RuntimeError("CRITICAL: C-Enclave memory lockdown is unavailable. Vault access denied.")
 
         if not salt:
             salt = os.urandom(16)
             
-        # --- Engineered Countermeasure: Duress Detection ---
         self.is_duress_mode = False
         if self.duress_hash:
             try:
@@ -102,7 +119,7 @@ class EntropyPipeline:
                 if ph.verify(self.duress_hash, secret):
                     self.is_duress_mode = True
             except VerifyMismatchError:
-                pass # Normal behavior, not the duress password
+                pass 
             
         secret_bytes = secret.encode('utf-8')
             
@@ -134,10 +151,6 @@ class EntropyPipeline:
             self.active_key_id = None
             gc.collect()
 
-    def generate_tenant_master_key(self) -> bytes:
-        """Generates 32 bytes of secure random entropy for a tenant."""
-        return os.urandom(32)
-
     def wrap_for_escrow(self, tenant_key: bytes, core_master_key: bytes) -> str:
         """Cryptographically wraps a tenant key with the core master key."""
         ciphertext, nonce = SoftwareAESGCM.encrypt(core_master_key, tenant_key)
@@ -148,12 +161,9 @@ class EntropyPipeline:
         try:
             data = bytes.fromhex(escrowed_hex)
             if len(data) < 12:
-                raise ValueError("Escrowed data is too short to contain a valid nonce.")
-                
+                raise ValueError("Escrowed data is too short for a valid nonce.")
             nonce = data[:12]
             ciphertext = data[12:]
-            
-            tenant_key = SoftwareAESGCM.decrypt(core_master_key, nonce, ciphertext)
-            return tenant_key
+            return SoftwareAESGCM.decrypt(core_master_key, nonce, ciphertext)
         except Exception as e:
-            raise ValueError("Escrow decryption failed. Invalid Master Key or tampered payload.") from e
+            raise ValueError("Escrow decryption failed.") from e
