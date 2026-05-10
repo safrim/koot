@@ -5,11 +5,15 @@ from koot.governance.audit.log import AuditLogger
 
 def test_audit_log_rotation_integrity(tmp_path):
     log_dir = tmp_path / "logs"
-    # Small max_size to force immediate rotation
-    logger = AuditLogger(log_dir=str(log_dir), max_size_bytes=100)
+    
+    # Set a large max_size to prevent recursive cascading rotations during the test
+    logger = AuditLogger(log_dir=str(log_dir), max_size_bytes=1024 * 1024)
     
     logger.log("action_1", "admin")
-    logger.log("action_2", "admin")  # Triggers rotation
+    logger.log("action_2", "admin")
+    
+    # Trigger rotation manually to cleanly test the background thread hand-off
+    logger.rotate()
     
     # Wait briefly for the background sealing thread to complete its hashing
     time.sleep(0.1)

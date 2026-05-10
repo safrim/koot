@@ -66,9 +66,9 @@ Here is your **Hardened Phased Implementation Plan** for the **Koot Zero-Trust S
 **Objective:** Implementation of self-defense mechanisms.
 
 * **Session 10: The Immutable Audit Log**
-* **Action:** Implement the append-only logger that cryptographically "seals" logs every 50MB.
+    * **Action:** Implement the append-only logger that cryptographically "seals" logs every 50MB.
 
 * **Session 11: The Manual Override & Nuke Matrix**
-* **Action:** Implement the `koot override --nuke` command to instantly shred the Shadow Ledger and wipe RAM.
+    * **Action:** Implement the `koot override --nuke` command to instantly shred the Shadow Ledger and wipe RAM.
 
 ---
