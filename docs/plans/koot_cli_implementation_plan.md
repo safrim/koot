@@ -57,8 +57,8 @@ Here is your **Hardened Phased Implementation Plan** for the **Koot Zero-Trust S
     * **Outcome:** A `certs/` folder with unique identity keys.
 
 * **Session 9: The Zero-Trust Gateway**
-* **Action:** Implement the mTLS listener. This is a separate "Gate" that sits in front of the core and drops any connection that doesn't provide a valid certificate.
-* **Outcome:** You can communicate with Koot over the internet as securely as if you were plugged in via USB.
+    * **Action:** Implement the mTLS listener. This is a separate "Gate" that sits in front of the core and drops any connection that doesn't provide a valid certificate.
+    * **Outcome:** You can communicate with Koot over the internet as securely as if you were plugged in via USB.
 
 ---
 
